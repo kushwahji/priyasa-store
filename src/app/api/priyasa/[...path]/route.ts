@@ -1,28 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || '').replace(/\/$/, '');
-
+const SESSION_COOKIE = 'priyasa_session';
+const TOKEN_COOKIE = 'priyasa_access';
 const ALLOWED_HEADERS = ['accept', 'authorization', 'content-type', 'idempotency-key', 'x-correlation-id', 'x-request-id'];
 
+function extractToken(body: any) {
+  return body?.data?.access_token || body?.data?.token || body?.access_token || body?.token || null;
+}
+
+function clearSession(response: NextResponse) {
+  response.cookies.set(SESSION_COOKIE, '', { path: '/', maxAge: 0 });
+  response.cookies.set(TOKEN_COOKIE, '', {
+    path: '/', maxAge: 0, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
+  });
+}
+
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  if (!UPSTREAM) {
-    return NextResponse.json(
-      { message: 'PRIYASA_API_BASE_URL is not configured', code: 'UPSTREAM_NOT_CONFIGURED' },
-      { status: 500 },
-    );
-  }
+  if (!UPSTREAM) return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured', code: 'UPSTREAM_NOT_CONFIGURED' }, { status: 500 });
 
   const { path } = await context.params;
-  const target = `${UPSTREAM}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
+  if (!path?.length || path.some((part) => part === '.' || part === '..')) {
+    return NextResponse.json({ message: 'Invalid API path' }, { status: 400 });
+  }
 
+  const target = `${UPSTREAM}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
   const headers = new Headers();
   for (const name of ALLOWED_HEADERS) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
 
+  // Prefer the HttpOnly server-managed token. Authorization remains supported for legacy clients.
+  const cookieToken = request.cookies.get(TOKEN_COOKIE)?.value;
+  if (cookieToken) headers.set('authorization', `Bearer ${cookieToken}`);
+
   const method = request.method.toUpperCase();
-  const body = method === 'GET' || method === 'HEAD' ? undefined : await request.arrayBuffer();
+  const body = method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : await request.arrayBuffer();
 
   try {
     const upstream = await fetch(target, {
@@ -31,24 +45,42 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       body,
       cache: 'no-store',
       redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
     });
 
-    const responseHeaders = new Headers();
-    const contentType = upstream.headers.get('content-type');
-    if (contentType) responseHeaders.set('content-type', contentType);
-    const correlationId = upstream.headers.get('x-correlation-id');
-    if (correlationId) responseHeaders.set('x-correlation-id', correlationId);
+    const contentType = upstream.headers.get('content-type') || 'application/json';
+    const text = await upstream.text();
+    let payload: any = null;
+    try { payload = text ? JSON.parse(text) : null; } catch { /* preserve non-JSON upstream body */ }
 
-    return new NextResponse(upstream.body, {
+    const response = new NextResponse(text || null, {
       status: upstream.status,
       statusText: upstream.statusText,
-      headers: responseHeaders,
+      headers: { 'content-type': contentType },
     });
+
+    const correlationId = upstream.headers.get('x-correlation-id');
+    if (correlationId) response.headers.set('x-correlation-id', correlationId);
+
+    if (upstream.status === 401) clearSession(response);
+
+    const normalizedPath = `/${path.join('/')}`;
+    if (upstream.ok && normalizedPath === '/auth/verify-otp') {
+      const accessToken = extractToken(payload);
+      if (accessToken) {
+        response.cookies.set(TOKEN_COOKIE, accessToken, {
+          path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30,
+        });
+        response.cookies.set(SESSION_COOKIE, '1', {
+          path: '/', httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30,
+        });
+      }
+    }
+
+    if (normalizedPath === '/auth/logout' && upstream.ok) clearSession(response);
+    return response;
   } catch {
-    return NextResponse.json(
-      { message: 'PRIYASA Core is unavailable', code: 'UPSTREAM_UNAVAILABLE' },
-      { status: 502 },
-    );
+    return NextResponse.json({ message: 'PRIYASA Core is unavailable', code: 'UPSTREAM_UNAVAILABLE' }, { status: 502 });
   }
 }
 
