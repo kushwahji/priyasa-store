@@ -5,8 +5,8 @@ const SESSION_COOKIE = 'priyasa_session';
 const TOKEN_COOKIE = 'priyasa_access';
 const ALLOWED_HEADERS = ['accept', 'authorization', 'content-type', 'idempotency-key', 'x-correlation-id', 'x-request-id'];
 
-function extractToken(body: any) {
-  return body?.data?.access_token || body?.data?.token || body?.access_token || body?.token || null;
+function extractToken(body: any, authorizationHeader?: string | null) {
+  return body?.data?.access_token || body?.data?.token || body?.access_token || body?.token || authorizationHeader?.replace(/^Bearer\s+/i, '') || null;
 }
 
 function stripToken(body: any) {
@@ -26,8 +26,17 @@ function clearSession(response: NextResponse) {
   });
 }
 
+function sameOrigin(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  return !origin || origin === request.nextUrl.origin;
+}
+
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   if (!UPSTREAM) return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured', code: 'UPSTREAM_NOT_CONFIGURED' }, { status: 500 });
+  const method = request.method.toUpperCase();
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !sameOrigin(request)) {
+    return NextResponse.json({ message: 'Cross-origin request rejected', code: 'ORIGIN_REJECTED' }, { status: 403 });
+  }
 
   const { path } = await context.params;
   if (!path?.length || path.some((part) => part === '.' || part === '..')) {
@@ -44,7 +53,6 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const cookieToken = request.cookies.get(TOKEN_COOKIE)?.value;
   if (cookieToken) headers.set('authorization', `Bearer ${cookieToken}`);
 
-  const method = request.method.toUpperCase();
   const body = method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : await request.arrayBuffer();
 
   try {
@@ -71,7 +79,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (upstream.status === 401) clearSession(response);
 
     if (isVerify) {
-      const accessToken = extractToken(payload);
+      const accessToken = extractToken(payload, upstream.headers.get('authorization'));
       if (accessToken) {
         response.cookies.set(TOKEN_COOKIE, accessToken, {
           path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30,
