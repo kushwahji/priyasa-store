@@ -5,15 +5,12 @@ const TOKEN_COOKIE = 'priyasa_access';
 const SESSION_COOKIE = 'priyasa_session';
 const COOKIE_OPTIONS = { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, maxAge: 60 * 60 * 24 * 30 };
 
-/** The Store does not own identity; PriyasaCore remains the authentication source of truth. */
+/** PriyasaCore remains the authentication source of truth; this route only adapts it to the Store browser session. */
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(TOKEN_COOKIE)?.value;
-  if (!token || !UPSTREAM) {
-    return NextResponse.json({ authenticated: false }, { headers: { 'Cache-Control': 'no-store' } });
-  }
-
+  if (!token || !UPSTREAM) return NextResponse.json({ authenticated: false }, { headers: { 'Cache-Control': 'no-store' } });
   try {
-    const upstream = await fetch(`${UPSTREAM}/storefront/cart`, {
+    const upstream = await fetch(`${UPSTREAM}/storefront/session`, {
       method: 'GET',
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       cache: 'no-store',
@@ -29,9 +26,6 @@ export async function GET(request: NextRequest) {
     }
     return response;
   } catch {
-    return NextResponse.json(
-      { authenticated: false, unavailable: true },
-      { headers: { 'Cache-Control': 'no-store' } },
-    );
+    return NextResponse.json({ authenticated: false, unavailable: true }, { headers: { 'Cache-Control': 'no-store' } });
   }
 }
