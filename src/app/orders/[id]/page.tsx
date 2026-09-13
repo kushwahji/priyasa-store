@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import AuthGuard from '@/components/AuthGuard';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import OrderTimeline from '@/components/OrderTimeline';
 
-type OrderItem={id?:string|number;order_item_id?:string|number;name?:string;product_name?:string;image?:string;quantity?:number;size?:string;color?:string;total?:number;line_total?:number;price?:number};
+type OrderItem={id?:string|number;order_item_id?:string|number;variant_id?:string|number;name?:string;product_name?:string;image?:string;quantity?:number;size?:string;color?:string;total?:number;line_total?:number;price?:number};
 type Order={id:string|number;order_number?:string;status?:string;payment_status?:string;total?:number;grand_total?:number;created_at?:string;items?:OrderItem[];shipping_address?:any;address?:any;shipment?:any};
 
 const cancellableStatuses=new Set(['pending_payment','payment_failed','confirmed','processing']);
-const returnableStatuses=new Set(['delivered','completed']);
+const returnableStatuses=new Set(['delivered']);
 
 function OrderDetailInner(){
  const params=useParams<{id:string}>();
@@ -20,7 +20,22 @@ function OrderDetailInner(){
  useEffect(()=>{void load()},[params.id]);
  async function cancel(){if(!order||busy||!cancellableStatuses.has(String(order.status||'').toLowerCase())||!window.confirm('Cancel this order?'))return;setBusy('cancel');setError('');setMessage('');try{await api(`/storefront/orders/${encodeURIComponent(String(order.id))}/cancel`,{method:'POST',body:JSON.stringify({reason:'Customer requested cancellation'})});setMessage('Order cancelled successfully.');await load()}catch(e){setError(e instanceof Error?e.message:'Cancellation failed')}finally{setBusy('')}}
  async function requestReturn(){if(!order||busy||!returnableStatuses.has(String(order.status||'').toLowerCase()))return;const reason=window.prompt('Reason for return?');if(!reason?.trim())return;const items=(order.items||[]).filter(item=>item.id||item.order_item_id);if(!items.length){setError('Return is unavailable because order item details are missing.');return}setBusy('return');setError('');setMessage('');try{await api(`/storefront/orders/${encodeURIComponent(String(order.id))}/returns`,{method:'POST',body:JSON.stringify({reason:reason.trim(),items:items.map(item=>({order_item_id:Number(item.order_item_id??item.id),quantity:Math.max(1,Number(item.quantity||1))}))})});setMessage('Return request submitted.');await load()}catch(e){setError(e instanceof Error?e.message:'Return request failed')}finally{setBusy('')}}
- async function reorder(){if(!order||busy)return;setBusy('reorder');setError('');setMessage('');try{await api(`/storefront/orders/${encodeURIComponent(String(order.id))}/reorder`,{method:'GET'});setMessage('Available items were added to your bag.');window.location.href='/cart'}catch(e){setError(e instanceof Error?e.message:'Unable to reorder this purchase')}finally{setBusy('')}}
+ async function reorder(){
+  if(!order||busy)return;setBusy('reorder');setError('');setMessage('');
+  try{
+   const r=await api<any>(`/orders/${encodeURIComponent(String(order.id))}/reorder`,{method:'GET'});
+   const candidates=Array.isArray(r.items)?r.items:(Array.isArray(r.data?.items)?r.data.items:(Array.isArray(r.data)?r.data:[]));
+   if(!candidates.length){setMessage('No items from this purchase are currently available to buy again.');return;}
+   let added=0;let failed=0;
+   for(const item of candidates){
+    const variantId=item.variant_id??item.variant?.id;
+    const quantity=Math.max(1,Number(item.quantity||1));
+    if(!variantId||!Number.isFinite(quantity)){failed++;continue}
+    try{await api('/storefront/cart/items',{method:'POST',body:JSON.stringify({variant_id:variantId,quantity})});added++}catch{failed++}
+   }
+   if(added>0){setMessage(failed?`${added} item${added===1?' was':'s were'} added to your bag. ${failed} item${failed===1?' was':'s were'} unavailable.`:`${added} item${added===1?' was':'s were'} added to your bag.`);window.location.href='/cart'}else setMessage('None of the items from this purchase are currently available to buy again.');
+  }catch(e){setError(e instanceof Error?e.message:'Unable to load items for reorder')}finally{setBusy('')}
+ }
  if(loading)return <main className="accountPage"><p className="muted">Loading order…</p></main>;
  if(error&&!order)return <main className="accountPage"><div className="formError" role="alert">{error}</div><button className="button" onClick={()=>void load()}>Retry</button><Link className="textLink" href="/orders">Back to orders</Link></main>;
  if(!order)return <main className="accountPage"><div className="emptyState"><h1>Order not found</h1><Link className="button" href="/orders">Back to orders</Link></div></main>;
