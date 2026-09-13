@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import { api } from '@/lib/api';
 
-type Item = { id: string | number; variant_id?: string | number; name?: string; quantity: number; unit_price?: number; price?: number; mrp?: number; line_total?: number; available_quantity?: number; in_stock?: boolean };
-type Cart = { items?: Item[]; subtotal?: number; discount?: number; total?: number; item_count?: number; quantity?: number; warnings?: Array<{ type?: string; item_id?: string | number }> };
+type Item = { id: string | number; variant_id?: string | number; name?: string; quantity: number; unit_price?: number; price?: number; mrp?: number; line_total?: number; available_quantity?: number; };
+type Cart = { items?: Item[]; subtotal?: number; discount?: number; total?: number; warnings?: Array<{ type?: string; item_id?: string | number }> };
 
 function CartContent() {
   const [cart, setCart] = useState<Cart | null>(null);
@@ -16,7 +16,7 @@ function CartContent() {
 
   async function load() {
     setLoading(true); setError('');
-    try { const r = await api<{ data?: Cart }>('/storefront/cart/experience'); setCart(r.data || null); }
+    try { const r = await api<{ data?: Cart }>('/storefront/cart'); setCart(r.data || null); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your bag'); }
     finally { setLoading(false); }
   }
