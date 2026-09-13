@@ -9,6 +9,16 @@ function extractToken(body: any) {
   return body?.data?.access_token || body?.data?.token || body?.access_token || body?.token || null;
 }
 
+function stripToken(body: any) {
+  if (!body || typeof body !== 'object') return { authenticated: true };
+  const { access_token: _accessToken, token: _token, ...top } = body;
+  if (top.data && typeof top.data === 'object') {
+    const { access_token: _dataAccessToken, token: _dataToken, ...data } = top.data;
+    return { ...top, authenticated: true, data: { ...data, authenticated: true } };
+  }
+  return { ...top, authenticated: true };
+}
+
 function clearSession(response: NextResponse) {
   response.cookies.set(SESSION_COOKIE, '', { path: '/', maxAge: 0 });
   response.cookies.set(TOKEN_COOKIE, '', {
@@ -31,7 +41,6 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (value) headers.set(name, value);
   }
 
-  // Prefer the HttpOnly server-managed token. Authorization remains supported for legacy clients.
   const cookieToken = request.cookies.get(TOKEN_COOKIE)?.value;
   if (cookieToken) headers.set('authorization', `Bearer ${cookieToken}`);
 
@@ -40,20 +49,18 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   try {
     const upstream = await fetch(target, {
-      method,
-      headers,
-      body,
-      cache: 'no-store',
-      redirect: 'manual',
-      signal: AbortSignal.timeout(15000),
+      method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000),
     });
 
     const contentType = upstream.headers.get('content-type') || 'application/json';
     const text = await upstream.text();
     let payload: any = null;
     try { payload = text ? JSON.parse(text) : null; } catch { /* preserve non-JSON upstream body */ }
+    const normalizedPath = `/${path.join('/')}`;
+    const isVerify = upstream.ok && normalizedPath === '/auth/verify-otp';
+    const output = isVerify ? JSON.stringify(stripToken(payload)) : text;
 
-    const response = new NextResponse(text || null, {
+    const response = new NextResponse(output || null, {
       status: upstream.status,
       statusText: upstream.statusText,
       headers: { 'content-type': contentType },
@@ -61,11 +68,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
     const correlationId = upstream.headers.get('x-correlation-id');
     if (correlationId) response.headers.set('x-correlation-id', correlationId);
-
     if (upstream.status === 401) clearSession(response);
 
-    const normalizedPath = `/${path.join('/')}`;
-    if (upstream.ok && normalizedPath === '/auth/verify-otp') {
+    if (isVerify) {
       const accessToken = extractToken(payload);
       if (accessToken) {
         response.cookies.set(TOKEN_COOKIE, accessToken, {
