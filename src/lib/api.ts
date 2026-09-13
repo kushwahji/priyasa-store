@@ -1,7 +1,7 @@
 const UPSTREAM=(process.env.PRIYASA_API_BASE_URL||process.env.PRIYASA_API_URL||'').replace(/\/$/,'');
-const BROWSER_BASE='/api/priyasa/proxy';
+const BROWSER_BASE='/api/priyasa';
 
-/** Browser auth is same-origin and HttpOnly; tokens are never exposed to JS. */
+/** Browser authentication is carried by the Store's HttpOnly session cookie. */
 export function getAccessToken(){return null}
 export function setAccessToken(_token:string){void _token}
 export function clearAccessToken(){void 0}
@@ -20,12 +20,12 @@ export async function api<T>(path:string,init:RequestInit={}){
     headers.set('Idempotency-Key',typeof crypto?.randomUUID==='function'?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`);
   }
   const normalized=path.startsWith('/')?path.slice(1):path;
-  const base=typeof window!=='undefined'?BROWSER_BASE:UPSTREAM;
-  const url=typeof window!=='undefined'?`${base}?path=${encodeURIComponent(normalized)}`:`${base}/${normalized}`;
+  const isBrowser=typeof window!=='undefined';
+  const url=isBrowser?`${BROWSER_BASE}/${normalized}`:`${UPSTREAM}/${normalized}`;
   try{
     const res=await fetch(url,{...init,headers,credentials:'include',cache:'no-store'});
     const body=await res.json().catch(()=>null);
-    if(res.status===401&&typeof window!=='undefined'&&!window.location.pathname.startsWith('/auth/login')){
+    if(res.status===401&&isBrowser&&!window.location.pathname.startsWith('/auth/login')){
       window.location.replace(loginUrl());
       throw new Error('Your session has expired. Please sign in again.');
     }
