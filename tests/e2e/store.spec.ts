@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+async function mockSession(page: any) {
+  await page.route('**/api/session', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) });
+  });
+}
+
 test('home and core commerce navigation render on desktop and mobile', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/PRIYASA/);
@@ -26,9 +32,60 @@ test('protected account route requires a valid same-origin session', async ({ pa
 });
 
 test('authenticated account route trusts the same-origin session API', async ({ page }) => {
-  await page.route('**/api/session', async route => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) });
-  });
+  await mockSession(page);
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: /my account/i })).toBeVisible();
+});
+
+test('OTP login validates mobile, requests OTP and verifies before redirect', async ({ page }) => {
+  await page.route('**/api/priyasa/auth/send-otp', async route => {
+    expect(route.request().method()).toBe('POST');
+    const body = route.request().postDataJSON();
+    expect(body.mobile).toBe('9876543210');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { request_id: 'e2e-request' } }) });
+  });
+  await page.route('**/api/priyasa/auth/verify-otp', async route => {
+    expect(route.request().method()).toBe('POST');
+    const body = route.request().postDataJSON();
+    expect(body.request_id).toBe('e2e-request');
+    expect(body.otp).toBe('123456');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) });
+  });
+  await page.goto('/auth/login?next=/account');
+  await page.getByLabel('Mobile number').fill('9876543210');
+  await page.getByRole('button', { name: /send otp/i }).click();
+  await expect(page.getByRole('heading', { name: /verify your otp/i })).toBeVisible();
+  await page.getByLabel('OTP').fill('123456');
+  await page.getByRole('button', { name: /verify & continue/i }).click();
+  await expect(page).toHaveURL(/\/account$/);
+});
+
+test('authenticated bag flows into checkout and creates a PriyasaCore order', async ({ page }) => {
+  await mockSession(page);
+  await page.route('**/api/priyasa/storefront/cart', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { items: [{ id: 'cart-1', name: 'E2E Kurti', quantity: 1, price: 1299 }] } }) });
+  });
+  await page.route('**/api/priyasa/storefront/addresses', async route => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ id: 'address-1', recipient_name: 'PRIYASA E2E', line1: '1 Test Street', city: 'Noida', state: 'Uttar Pradesh', postal_code: '201301', is_default: true }] }) });
+      return;
+    }
+    await route.continue();
+  });
+  await page.route('**/api/priyasa/storefront/checkout/create-order', async route => {
+    expect(route.request().method()).toBe('POST');
+    const body = route.request().postDataJSON();
+    expect(body.shipping_address_id).toBe('address-1');
+    expect(body.payment_method).toBe('razorpay');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { order_id: 'order-e2e' } }) });
+  });
+
+  await page.goto('/cart');
+  await expect(page.getByRole('heading', { name: /shopping bag/i })).toBeVisible();
+  await expect(page.getByText('E2E Kurti')).toBeVisible();
+  await page.getByRole('link', { name: /proceed to checkout/i }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole('heading', { name: /secure checkout/i })).toBeVisible();
+  await page.getByRole('button', { name: /continue to payment/i }).click();
+  await expect(page).toHaveURL(/\/checkout\/payment\?order=order-e2e/);
 });
