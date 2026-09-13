@@ -22,6 +22,14 @@ function forwardedHeaders(request: NextRequest) {
   return headers;
 }
 
+function sessionCookieOptions(value: string, maxAge: number) {
+  return { name: SESSION_COOKIE, value, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge };
+}
+
+function clearSession(result: NextResponse) {
+  result.cookies.set(sessionCookieOptions('', 0));
+}
+
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   try {
     const { path } = await context.params;
@@ -52,11 +60,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const data = body?.data && typeof body.data === 'object' ? dataOrNull(body.data) : null;
     const token = body?.access_token || body?.token || body?.accessToken || data?.access_token || data?.token || data?.accessToken;
 
-    if (response.ok && pathname === '/auth/verify-otp' && typeof token === 'string' && token.length > 0) {
-      result.cookies.set({ name: SESSION_COOKIE, value: token, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 });
+    if (response.ok && (pathname === '/auth/verify-otp' || pathname === '/storefront/session/rotate') && typeof token === 'string' && token.length > 0) {
+      result.cookies.set(sessionCookieOptions(token, 60 * 60 * 24 * 30));
     }
-    if (pathname === '/auth/logout') {
-      result.cookies.set({ name: SESSION_COOKIE, value: '', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 });
+    if (pathname === '/auth/logout' || pathname === '/storefront/session/logout' || pathname === '/storefront/session/logout-all') {
+      clearSession(result);
     }
     return result;
   } catch (error) {
