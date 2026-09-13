@@ -1,22 +1,52 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 /**
- * The Store cannot read its HttpOnly access cookie from the browser.
- * Protected API requests are the source of truth; the API client redirects
- * to login on a real 401 instead of depending on an undocumented /me/session route.
+ * Uses a same-origin session hint because the access token is HttpOnly.
+ * PriyasaCore remains authoritative; any protected API 401 is handled by the
+ * API client and redirects the customer back to login.
  */
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
+  const [state, setState] = useState<'loading' | 'authenticated' | 'guest'>('loading');
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    let active = true;
+    fetch('/api/session', { credentials: 'include', cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error('session check failed');
+        return response.json() as Promise<{ authenticated?: boolean }>;
+      })
+      .then(data => {
+        if (active) setState(data.authenticated ? 'authenticated' : 'guest');
+      })
+      .catch(() => {
+        if (active) setState('guest');
+      });
+    return () => { active = false; };
+  }, []);
 
-  if (!mounted) {
+  if (state === 'loading') {
     return (
       <main className="accountPage">
         <section className="authCard">
-          <p className="muted">Loading your PRIYASA account…</p>
+          <p className="muted">Checking your PRIYASA session…</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (state === 'guest') {
+    return (
+      <main className="accountPage">
+        <section className="emptyState">
+          <span className="eyebrow">PRIYASA ACCOUNT</span>
+          <h1>Sign in to continue</h1>
+          <p>Sign in once to access your account, orders, wishlist and checkout.</p>
+          <Link className="button" href={`/auth/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
+            Sign in with OTP
+          </Link>
         </section>
       </main>
     );
