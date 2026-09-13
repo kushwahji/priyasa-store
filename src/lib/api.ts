@@ -16,15 +16,22 @@ export async function api<T>(path:string,init:RequestInit={}){
   const headers=new Headers(init.headers);
   headers.set('Accept','application/json');
   if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
-  if(['POST','PUT','PATCH','DELETE'].includes((init.method||'GET').toUpperCase())&&!headers.has('Idempotency-Key'))headers.set('Idempotency-Key',crypto.randomUUID());
+  if(['POST','PUT','PATCH','DELETE'].includes((init.method||'GET').toUpperCase())&&!headers.has('Idempotency-Key')){
+    headers.set('Idempotency-Key',typeof crypto?.randomUUID==='function'?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  }
   const normalized=path.startsWith('/')?path:`/${path}`;
   const base=typeof window!=='undefined'?BROWSER_BASE:UPSTREAM;
-  const res=await fetch(`${base}${normalized}`,{...init,headers,credentials:'include',cache:'no-store'});
-  const body=await res.json().catch(()=>null);
-  if(res.status===401&&typeof window!=='undefined'&&!window.location.pathname.startsWith('/auth/login')){
-    window.location.replace(loginUrl());
-    throw new Error('Your session has expired. Please sign in again.');
+  try{
+    const res=await fetch(`${base}${normalized}`,{...init,headers,credentials:'include',cache:'no-store'});
+    const body=await res.json().catch(()=>null);
+    if(res.status===401&&typeof window!=='undefined'&&!window.location.pathname.startsWith('/auth/login')){
+      window.location.replace(loginUrl());
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+    if(!res.ok)throw new Error(body?.message||body?.error||`PRIYASA_API_${res.status}`);
+    return body as T;
+  }catch(error){
+    if(error instanceof Error&&error.message!=='Failed to fetch')throw error;
+    throw new Error('Unable to reach PRIYASA Core. Check the Store deployment and PRIYASA_API_BASE_URL.');
   }
-  if(!res.ok)throw new Error(body?.message||body?.error||`PRIYASA_API_${res.status}`);
-  return body as T;
 }
