@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function Checkout(){return <main className="container"><section className="section"><span className="eyebrow">CHECKOUT</span><h1>Secure checkout</h1><p className="muted">Address, delivery, coupon, payment and order confirmation will be orchestrated through PriyasaCore. Razorpay should receive a server-created order and its success signature must be verified server-side before fulfillment. citeturn0search0</p><Link className="button" href="/cart">Review bag</Link></section></main>}
