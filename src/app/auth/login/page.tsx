@@ -7,9 +7,7 @@ import { api } from '@/lib/api';
 function LoginForm() {
   const params = useSearchParams();
   const requestedNext = params.get('next');
-  const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
-    ? requestedNext
-    : '/account';
+  const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/account';
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [requestId, setRequestId] = useState('');
@@ -35,8 +33,9 @@ function LoginForm() {
     if (!requestId) return sendOtp();
     setBusy(true); setError(''); setMessage('');
     try {
-      await api('/auth/resend-otp', { method: 'POST', body: JSON.stringify({ request_id: requestId }) });
-      setMessage('A new OTP has been sent.');
+      const r = await api<any>('/auth/resend-otp', { method: 'POST', body: JSON.stringify({ request_id: requestId }) });
+      const id = r.data?.request_id || r.request_id || requestId;
+      setRequestId(id); setMessage('A new OTP has been sent.');
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to resend OTP'); }
     finally { setBusy(false); }
   }
@@ -46,8 +45,9 @@ function LoginForm() {
     if (otp.length !== 6 || !requestId) { setError('Enter the 6-digit OTP.'); return; }
     setBusy(true);
     try {
-      const r = await api<any>('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, otp, request_id: requestId }) });
-      if (!(r?.authenticated || r?.data?.authenticated)) throw new Error('Login succeeded without establishing a session.');
+      // The BFF stores the Core access token as an HttpOnly cookie on successful verification.
+      // Login therefore depends only on the HTTP success contract, not a response JSON shape.
+      await api('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, otp, request_id: requestId }) });
       window.location.replace(next);
     } catch (e) { setError(e instanceof Error ? e.message : 'Invalid OTP'); }
     finally { setBusy(false); }
