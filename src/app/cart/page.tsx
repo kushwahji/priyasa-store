@@ -1,51 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import AuthGuard from '@/components/AuthGuard';
-import { api } from '@/lib/api';
-
-type Item = { id: string | number; variant_id?: string | number; name?: string; quantity: number; unit_price?: number; price?: number; mrp?: number; line_total?: number; available_quantity?: number; };
-type Cart = { items?: Item[]; subtotal?: number; discount?: number; total?: number; warnings?: Array<{ type?: string; item_id?: string | number }> };
-
-function CartContent() {
-  const [cart, setCart] = useState<Cart | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-
-  async function load() {
-    setLoading(true); setError('');
-    try { const r = await api<{ data?: Cart }>('/storefront/cart'); setCart(r.data || null); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load your bag'); }
-    finally { setLoading(false); }
-  }
-  useEffect(() => { load(); }, []);
-
-  async function remove(id: string | number) {
-    setBusy(String(id)); setError('');
-    try { await api(`/storefront/cart/items/${encodeURIComponent(String(id))}`, { method: 'DELETE' }); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Unable to remove item'); }
-    finally { setBusy(null); }
-  }
-
-  async function update(id: string | number, quantity: number) {
-    if (quantity < 1) return remove(id);
-    setBusy(String(id)); setError('');
-    try { await api(`/storefront/cart/items/${encodeURIComponent(String(id))}`, { method: 'PATCH', body: JSON.stringify({ quantity }) }); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Unable to update quantity'); }
-    finally { setBusy(null); }
-  }
-
-  const items = cart?.items || [];
-  const total = Number(cart?.total ?? cart?.subtotal ?? items.reduce((sum, item) => sum + Number(item.line_total ?? Number(item.unit_price ?? item.price ?? 0) * item.quantity), 0));
-  const hasWarnings = Boolean(cart?.warnings?.length);
-
-  return <main className="cartPage"><div className="sectionHead"><div><span className="eyebrow">PRIYASA / YOUR BAG</span><h1>Shopping bag</h1></div><Link className="textLink" href="/shop">Continue shopping →</Link></div>
-    {error && <div className="formError" role="alert">{error} <button className="textButton" onClick={load}>Retry</button></div>}
-    {hasWarnings && <div className="formError" role="alert">Some bag items need attention because price or stock changed. Review the item details before checkout.</div>}
-    {loading ? <div className="emptyState"><h2>Loading your bag…</h2></div> : !items.length ? <div className="emptyState"><h2>Your bag is empty</h2><p>Discover styles you'll love.</p><Link className="button" href="/shop">Shop now</Link></div> : <div className="cartLayout"><section>{items.map(i => <article className="cartItem" key={String(i.id)}><div className="cartThumb"><span>PRIYASA</span></div><div><strong>{i.name || 'Product'}</strong><small>Variant #{i.variant_id || i.id}</small><b>₹{Number(i.unit_price ?? i.price ?? 0).toLocaleString('en-IN')}</b>{Number(i.mrp || 0) > Number(i.unit_price ?? i.price ?? 0) && <del>₹{Number(i.mrp).toLocaleString('en-IN')}</del>}<div className="qty"><button aria-label={`Decrease ${i.name || 'item'}`} disabled={busy === String(i.id)} onClick={() => update(i.id, i.quantity - 1)}>−</button><span aria-live="polite">{i.quantity}</span><button aria-label={`Increase ${i.name || 'item'}`} disabled={busy === String(i.id) || Number(i.available_quantity ?? Infinity) <= i.quantity} onClick={() => update(i.id, i.quantity + 1)}>+</button></div><button className="textButton" disabled={busy === String(i.id)} onClick={() => remove(i.id)}>{busy === String(i.id) ? 'Updating…' : 'Remove'}</button></div></article>)}</section><aside className="summary"><span className="eyebrow">PRICE DETAILS</span><div><span>Subtotal</span><b>₹{Number(cart?.subtotal || total).toLocaleString('en-IN')}</b></div><div><span>Discount</span><b>- ₹{Number(cart?.discount || 0).toLocaleString('en-IN')}</b></div><hr /><div><strong>Total</strong><strong>₹{total.toLocaleString('en-IN')}</strong></div><Link className={`button ${hasWarnings ? 'secondary' : ''}`} href={hasWarnings ? '/cart' : '/checkout'}>{hasWarnings ? 'Review bag' : 'Proceed to checkout'}</Link></aside></div>}
-  </main>;
-}
-
-export default function Cart() { return <AuthGuard><CartContent /></AuthGuard>; }
+import Link from 'next/link'; import { useEffect,useState } from 'react'; import AuthGuard from '@/components/AuthGuard'; import { api } from '@/lib/api';
+type Item={id:string|number;variant_id?:string|number;name?:string;quantity:number;unit_price?:number;price?:number;mrp?:number;line_total?:number;available_quantity?:number;in_stock?:boolean}; type Cart={items?:Item[];subtotal?:number;discount?:number;total?:number;warnings?:Array<{type?:string;item_id?:string|number}>;checkout_ready?:boolean};
+function CartContent(){const[cart,setCart]=useState<Cart|null>(null);const[loading,setLoading]=useState(true);const[error,setError]=useState('');const[busy,setBusy]=useState<string|null>(null);async function load(){setLoading(true);setError('');try{const r=await api<{data?:Cart}>('/storefront/cart/experience');setCart(r.data||null)}catch(e){setError(e instanceof Error?e.message:'Unable to load your bag')}finally{setLoading(false)}}useEffect(()=>{load()},[]);async function remove(id:string|number){setBusy(String(id));setError('');try{await api(`/storefront/cart/items/${encodeURIComponent(String(id))}`,{method:'DELETE'});await load()}catch(e){setError(e instanceof Error?e.message:'Unable to remove item')}finally{setBusy(null)}}async function update(id:string|number,quantity:number){if(quantity<1)return remove(id);setBusy(String(id));setError('');try{await api(`/storefront/cart/items/${encodeURIComponent(String(id))}`,{method:'PATCH',body:JSON.stringify({quantity})});await load()}catch(e){setError(e instanceof Error?e.message:'Unable to update quantity')}finally{setBusy(null)}}const items=cart?.items||[];const total=Number(cart?.total??cart?.subtotal??items.reduce((s,i)=>s+Number(i.line_total??Number(i.unit_price??i.price??0)*i.quantity),0));const warnings=Boolean(cart?.warnings?.length);return <main className="cartPage"><div className="sectionHead"><div><span className="eyebrow">PRIYASA / YOUR BAG</span><h1>Shopping bag</h1></div><Link className="textLink" href="/shop">Continue shopping →</Link></div>{error&&<div className="formError" role="alert">{error}<button className="textButton" onClick={load}>Retry</button></div>}{warnings&&<div className="formError" role="alert">Some items need attention because price or stock changed. Review them before checkout.</div>}{loading?<div className="emptyState"><h2>Loading your bag…</h2></div>:!items.length?<div className="emptyState"><h2>Your bag is empty</h2><p>Discover styles you'll love.</p><Link className="button" href="/shop">Shop now</Link></div>:<div className="cartLayout"><section>{items.map(i=><article className="cartItem" key={String(i.id)}><div className="cartThumb"><span>PRIYASA</span></div><div><strong>{i.name||'Product'}</strong><small>Variant #{i.variant_id||i.id}</small><b>₹{Number(i.unit_price??i.price??0).toLocaleString('en-IN')}</b>{Number(i.mrp||0)>Number(i.unit_price??i.price??0)&&<del>₹{Number(i.mrp).toLocaleString('en-IN')}</del>}<div className="qty"><button aria-label={`Decrease ${i.name||'item'}`} disabled={busy===String(i.id)} onClick={()=>update(i.id,i.quantity-1)}>−</button><span aria-live="polite">{i.quantity}</span><button aria-label={`Increase ${i.name||'item'}`} disabled={busy===String(i.id)||i.in_stock===false||(Number(i.available_quantity??Infinity)<=i.quantity)} onClick={()=>update(i.id,i.quantity+1)}>+</button></div><button className="textButton" disabled={busy===String(i.id)} onClick={()=>remove(i.id)}>{busy===String(i.id)?'Updating…':'Remove'}</button></div></article>)}</section><aside className="summary"><span className="eyebrow">PRICE DETAILS</span><div><span>Subtotal</span><b>₹{Number(cart?.subtotal||total).toLocaleString('en-IN')}</b></div><div><span>Discount</span><b>- ₹{Number(cart?.discount||0).toLocaleString('en-IN')}</b></div><hr/><div><strong>Total</strong><strong>₹{total.toLocaleString('en-IN')}</strong></div><Link className={`button ${warnings||cart?.checkout_ready===false?'secondary':''}`} href={warnings||cart?.checkout_ready===false?'/cart':'/checkout'}>{warnings||cart?.checkout_ready===false?'Review bag':'Proceed to checkout'}</Link></aside></div>}</main>}
+export default function Cart(){return <AuthGuard><CartContent/></AuthGuard>}
