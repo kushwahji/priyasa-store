@@ -1,5 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api, clearAccessToken, getAccessToken } from '@/lib/api';
-export default function Account(){const [user,setUser]=useState<any>(null);const [loading,setLoading]=useState(true);useEffect(()=>{if(!getAccessToken()){setLoading(false);return}api<any>('/auth/me').then(r=>setUser(r.data||r.user||r)).catch(()=>{}).finally(()=>setLoading(false))},[]);if(!getAccessToken()&&!loading)return <main className="accountPage"><section className="emptyState"><span className="eyebrow">MY PRIYASA</span><h1>Sign in to continue</h1><p>Access your orders, wishlist, addresses and support.</p><Link className="button" href="/auth/login">Sign in with OTP</Link></section></main>;return <main className="accountPage"><span className="eyebrow">MY PRIYASA</span><h1>{loading?'Loading…':`Hello${user?.name?`, ${user.name}`:''}`}</h1><div className="accountGrid"><Link href="/orders"><strong>My orders</strong><small>Track, cancel and return orders</small></Link><Link href="/wishlist"><strong>Wishlist</strong><small>Saved styles and favourites</small></Link><Link href="/addresses"><strong>Addresses</strong><small>Manage delivery addresses</small></Link><Link href="/support"><strong>Help & support</strong><small>Get help with your purchase</small></Link></div><button className="textButton" onClick={()=>{clearAccessToken();location.href='/'}}>Sign out</button></main>}
+import AuthGuard from '@/components/AuthGuard';
+import { api, clearAccessToken } from '@/lib/api';
+
+function AccountContent(){
+  const [user,setUser]=useState<any>(null);
+  useEffect(()=>{api<any>('/auth/me').then(r=>setUser(r.data||r.user||r)).catch(()=>{})},[]);
+  return <main className="accountPage"><span className="eyebrow">MY PRIYASA</span><h1>Hello{user?.name?`, ${user.name}`:''}</h1><div className="accountGrid"><Link href="/orders"><strong>My orders</strong><small>Track, cancel and return orders</small></Link><Link href="/wishlist"><strong>Wishlist</strong><small>Saved styles and favourites</small></Link><Link href="/addresses"><strong>Addresses</strong><small>Manage delivery addresses</small></Link><Link href="/support"><strong>Help & support</strong><small>Get help with your purchase</small></Link></div><button className="textButton" onClick={()=>{clearAccessToken();location.href='/'}}>Sign out</button></main>
+}
+export default function Account(){return <AuthGuard><AccountContent/></AuthGuard>}
