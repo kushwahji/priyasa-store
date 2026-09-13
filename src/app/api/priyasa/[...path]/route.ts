@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
+const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || '').replace(/\/$/, '');
 
 const ALLOWED_HEADERS = ['accept', 'authorization', 'content-type', 'idempotency-key', 'x-correlation-id', 'x-request-id'];
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  if (!UPSTREAM) {
+    return NextResponse.json(
+      { message: 'PRIYASA_API_BASE_URL is not configured', code: 'UPSTREAM_NOT_CONFIGURED' },
+      { status: 500 },
+    );
+  }
+
   const { path } = await context.params;
   const target = `${UPSTREAM}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
 
@@ -23,6 +30,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       headers,
       body,
       cache: 'no-store',
+      redirect: 'manual',
     });
 
     const responseHeaders = new Headers();
