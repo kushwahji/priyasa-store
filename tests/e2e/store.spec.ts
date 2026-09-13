@@ -42,6 +42,7 @@ test('OTP login validates mobile, requests OTP and verifies before redirect', as
     expect(route.request().method()).toBe('POST');
     const body = route.request().postDataJSON();
     expect(body.mobile).toBe('9876543210');
+    expect(body.channel).toBe('auto');
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { request_id: 'e2e-request' } }) });
   });
   await page.route('**/api/priyasa/auth/verify-otp', async route => {
@@ -58,6 +59,31 @@ test('OTP login validates mobile, requests OTP and verifies before redirect', as
   await page.getByLabel('OTP').fill('123456');
   await page.getByRole('button', { name: /verify & continue/i }).click();
   await expect(page).toHaveURL(/\/account$/);
+});
+
+test('expired protected API session redirects to login instead of rendering stale account data', async ({ page }) => {
+  await mockSession(page);
+  await page.route('**/api/priyasa/storefront/orders', async route => {
+    await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Unauthenticated' }) });
+  });
+  await page.goto('/orders');
+  await expect(page).toHaveURL(/\/auth\/login\?next=%2Forders/);
+  await expect(page.getByRole('heading', { name: /sign in to priyasa/i })).toBeVisible();
+});
+
+test('sign out calls PriyasaCore logout and returns to storefront', async ({ page }) => {
+  await mockSession(page);
+  let logoutCalled = false;
+  await page.route('**/api/priyasa/auth/logout', async route => {
+    logoutCalled = true;
+    expect(route.request().method()).toBe('POST');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
+  });
+  await page.goto('/account');
+  await expect(page.getByRole('heading', { name: /my account/i })).toBeVisible();
+  await page.getByRole('button', { name: /sign out/i }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(logoutCalled).toBe(true);
 });
 
 test('authenticated bag flows into checkout and creates a PriyasaCore order', async ({ page }) => {
