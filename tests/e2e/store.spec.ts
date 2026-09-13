@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 
-async function mockSession(page: any) {
-  await page.route('**/api/session', async route => {
+async function mockSession(page: Page) {
+  await page.route('**/api/session', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) });
   });
 }
