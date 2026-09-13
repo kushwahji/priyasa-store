@@ -16,13 +16,13 @@ test('search route is usable', async ({ page }) => {
   await expect(page.getByLabel('Search products')).toHaveValue('kurti');
 });
 
-test('protected account route redirects unauthenticated visitors', async ({ page }) => {
+test('protected account route requires a valid same-origin session', async ({ page }) => {
   await page.route('**/api/session', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: false }) });
   });
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: /sign in to continue/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /sign in with otp/i })).toHaveAttribute('href', '/auth/login');
+  await expect(page.getByRole('link', { name: /sign in with otp/i })).toHaveAttribute('href', /\/auth\/login\?next=/);
 });
 
 test('authenticated account route trusts the same-origin session API', async ({ page }) => {
