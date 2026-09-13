@@ -35,17 +35,17 @@ function sameOrigin(request: NextRequest) {
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   if (!UPSTREAM) {
-    return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured on the Store server', code: 'UPSTREAM_NOT_CONFIGURED' }, { status: 500 });
+    return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured on the Store server', code: 'UPSTREAM_NOT_CONFIGURED' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const method = request.method.toUpperCase();
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !sameOrigin(request)) {
-    return NextResponse.json({ message: 'Cross-origin request rejected', code: 'ORIGIN_REJECTED' }, { status: 403 });
+    return NextResponse.json({ message: 'Cross-origin request rejected', code: 'ORIGIN_REJECTED' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const { path } = await context.params;
   if (!path?.length || path.some((part) => part === '.' || part === '..')) {
-    return NextResponse.json({ message: 'Invalid API path' }, { status: 400 });
+    return NextResponse.json({ message: 'Invalid API path' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const target = `${UPSTREAM}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
@@ -79,7 +79,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const response = new NextResponse(output || null, {
       status: upstream.status,
       statusText: upstream.statusText,
-      headers: { 'content-type': contentType },
+      headers: {
+        'content-type': contentType,
+        'cache-control': 'no-store, max-age=0',
+        'x-content-type-options': 'nosniff',
+      },
     });
 
     const correlationId = upstream.headers.get('x-correlation-id');
@@ -101,7 +105,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       method,
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ message: 'PRIYASA Core could not be reached from the Store server', code: 'UPSTREAM_UNAVAILABLE' }, { status: 502 });
+    return NextResponse.json({ message: 'PRIYASA Core could not be reached from the Store server', code: 'UPSTREAM_UNAVAILABLE' }, { status: 502, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
