@@ -14,11 +14,12 @@ function forwardedHeaders(request: NextRequest) {
   const headers = new Headers();
   request.headers.forEach((value, key) => {
     const lower = key.toLowerCase();
-    if (!HOP_BY_HOP.has(lower) && lower !== 'cookie') headers.set(key, value);
+    if (!HOP_BY_HOP.has(lower) && lower !== 'cookie' && lower !== 'authorization') headers.set(key, value);
   });
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (token) headers.set('Authorization', `Bearer ${token}`);
   headers.set('X-Forwarded-Host', request.headers.get('host') || '');
+  headers.set('X-Forwarded-Proto', request.nextUrl.protocol.replace(':', ''));
   return headers;
 }
 
@@ -28,6 +29,10 @@ function sessionCookieOptions(value: string, maxAge: number) {
 
 function clearSession(result: NextResponse) {
   result.cookies.set(sessionCookieOptions('', 0));
+}
+
+function dataOrNull(value: unknown): Record<string, any> | null {
+  return value && typeof value === 'object' ? value as Record<string, any> : null;
 }
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
@@ -52,9 +57,6 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     });
     if (contentType) result.headers.set('content-type', contentType);
 
-    const upstreamCookie = response.headers.get('set-cookie');
-    if (upstreamCookie) result.headers.append('set-cookie', upstreamCookie);
-
     const pathname = `/${path.join('/')}`;
     const body = isJson && payload && typeof payload === 'object' ? payload as Record<string, any> : null;
     const data = body?.data && typeof body.data === 'object' ? dataOrNull(body.data) : null;
@@ -63,7 +65,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (response.ok && (pathname === '/auth/verify-otp' || pathname === '/storefront/session/rotate') && typeof token === 'string' && token.length > 0) {
       result.cookies.set(sessionCookieOptions(token, 60 * 60 * 24 * 30));
     }
-    if (pathname === '/auth/logout' || pathname === '/storefront/session/logout' || pathname === '/storefront/session/logout-all') {
+    if (pathname === '/auth/logout' || pathname === '/storefront/session/logout' || pathname === '/storefront/session/logout-all' || response.status === 401) {
       clearSession(result);
     }
     return result;
@@ -71,10 +73,6 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const message = error instanceof Error ? error.message : 'Unable to reach PriyasaCore.';
     return NextResponse.json({ message }, { status: 502 });
   }
-}
-
-function dataOrNull(value: unknown): Record<string, any> | null {
-  return value && typeof value === 'object' ? value as Record<string, any> : null;
 }
 
 export const GET = proxy;
