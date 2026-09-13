@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '@/lib/api';
 import AuthGuard from '@/components/AuthGuard';
 
 function InvoiceInner() {
@@ -23,16 +22,25 @@ function InvoiceInner() {
   }, [id]);
 
   useEffect(() => { void load(); }, [load]);
-  const items = Array.isArray(invoice?.items) ? invoice.items : (Array.isArray(invoice?.line_items) ? invoice.line_items : []);
+  const items = Array.isArray(invoice?.lines) ? invoice.lines : (Array.isArray(invoice?.items) ? invoice.items : (Array.isArray(invoice?.line_items) ? invoice.line_items : []));
+  const money = (value: unknown) => `₹${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const address = invoice?.shipping_address || {};
 
   return <main className="accountPage">
     <div className="sectionHead"><div><span className="eyebrow">PRIYASA / INVOICE</span><h1>Invoice</h1></div><Link className="textLink" href={`/orders/${encodeURIComponent(id)}`}>← Order</Link></div>
     {loading ? <div className="emptyState"><p className="muted">Loading invoice…</p></div> : error ? <div className="emptyState"><div className="formError" role="alert">{error}</div><button className="button" onClick={() => void load()}>Retry</button></div> : <div className="checkoutCard invoiceCard">
-      {invoice?.invoice_number && <p><b>Invoice:</b> {invoice.invoice_number}</p>}
-      <h2>Order #{invoice?.order_number || invoice?.order_id || id}</h2>
+      <div className="orderStatus"><strong>{invoice?.status || 'Issued'}</strong><span>{invoice?.invoice_number || `Order #${invoice?.order_id || id}`}</span></div>
       {invoice?.issued_at && <p className="muted">Issued {new Date(invoice.issued_at).toLocaleString('en-IN')}</p>}
-      {items.length ? items.map((item: any, i: number) => <div className="cartItem" key={item.id || i}><div><b>{item.name || item.product_name || 'Product'}</b><p className="muted">Qty {item.quantity || 1}</p></div><strong>₹{Number(item.total ?? item.amount ?? item.price ?? 0).toLocaleString('en-IN')}</strong></div>) : <p className="muted">No invoice line items were returned.</p>}
-      <hr/><div><strong>Total</strong><strong>₹{Number(invoice?.total ?? invoice?.grand_total ?? 0).toLocaleString('en-IN')}</strong></div>
+      {invoice?.seller_gstin && <p className="muted">Seller GSTIN: {invoice.seller_gstin}</p>}
+      {address?.recipient_name && <div><b>Shipping address</b><p>{address.recipient_name}<br/>{address.line1 || ''}{address.line2 ? <><br/>{address.line2}</> : null}<br/>{address.city || ''}, {address.state || ''} {address.postal_code || address.pincode || ''}</p></div>}
+      <h2>Items</h2>
+      {items.length ? items.map((item: any, i: number) => <div className="cartItem" key={item.order_item_id || item.id || i}><div><b>{item.product_name || item.name || 'Product'}</b><p className="muted">{item.variant_label ? `${item.variant_label} · ` : ''}Qty {item.quantity || 1} · Unit {money(item.unit_price)}</p></div><strong>{money(item.line_total ?? item.total ?? item.amount ?? item.price)}</strong></div>) : <p className="muted">No invoice line items were returned.</p>}
+      <hr/>
+      <div><span>Subtotal</span><strong>{money(invoice?.subtotal)}</strong></div>
+      <div><span>Discount</span><strong>−{money(invoice?.discount_total)}</strong></div>
+      <div><span>Tax</span><strong>{money(invoice?.tax_total)}</strong></div>
+      <div><span>Shipping</span><strong>{money(invoice?.shipping_total)}</strong></div>
+      <div><strong>Total</strong><strong>{money(invoice?.grand_total ?? invoice?.total)}</strong></div>
     </div>}
   </main>;
 }
