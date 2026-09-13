@@ -35,6 +35,15 @@ test('authenticated account route renders behind the same-origin session guard',
   await expect(page.getByRole('heading', { name: /my account/i })).toBeVisible();
 });
 
+test('session endpoint reports authenticated only when the HttpOnly session cookie exists', async ({ page, context }) => {
+  await page.goto('/');
+  const guest = await page.evaluate(async () => (await fetch('/api/session', { cache: 'no-store' })).json());
+  expect(guest.authenticated).toBe(false);
+  await context.addCookies([{ name: 'priyasa_access_token', value: 'e2e-token', url: 'http://127.0.0.1:3000', httpOnly: true }]);
+  const authenticated = await page.evaluate(async () => (await fetch('/api/session', { cache: 'no-store' })).json());
+  expect(authenticated.authenticated).toBe(true);
+});
+
 test('OTP login validates mobile, requests OTP and verifies before redirect', async ({ page }) => {
   await page.route('**/api/priyasa/auth/send-otp', async route => {
     expect(route.request().method()).toBe('POST');
@@ -50,8 +59,6 @@ test('OTP login validates mobile, requests OTP and verifies before redirect', as
     expect(body.otp).toBe('123456');
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true, token: 'e2e-token' }) });
   });
-  // The mocked upstream response above bypasses the real BFF cookie-setting
-  // response, so expose the expected post-login session state explicitly.
   await mockSession(page);
   await page.goto('/auth/login?next=/account');
   await page.getByLabel('Mobile number').fill('9876543210');
