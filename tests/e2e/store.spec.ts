@@ -1,8 +1,8 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-async function mockSession(page: Page) {
+async function mockSession(page: Page, authenticated = true) {
   await page.route('**/api/session', async route => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated }) });
   });
 }
 
@@ -23,9 +23,7 @@ test('search route is usable', async ({ page }) => {
 });
 
 test('protected account route requires a same-origin session', async ({ page }) => {
-  await page.route('**/api/session', async route => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: false }) });
-  });
+  await mockSession(page, false);
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: /sign in to continue/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /sign in with otp/i })).toHaveAttribute('href', /\/auth\/login\?next=/);
@@ -52,6 +50,9 @@ test('OTP login validates mobile, requests OTP and verifies before redirect', as
     expect(body.otp).toBe('123456');
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true, token: 'e2e-token' }) });
   });
+  // The mocked upstream response above bypasses the real BFF cookie-setting
+  // response, so expose the expected post-login session state explicitly.
+  await mockSession(page);
   await page.goto('/auth/login?next=/account');
   await page.getByLabel('Mobile number').fill('9876543210');
   await page.getByRole('button', { name: /send otp/i }).click();
@@ -59,6 +60,7 @@ test('OTP login validates mobile, requests OTP and verifies before redirect', as
   await page.getByLabel('OTP').fill('123456');
   await page.getByRole('button', { name: /verify & continue/i }).click();
   await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByRole('heading', { name: /my account/i })).toBeVisible();
 });
 
 test('expired protected API session redirects to login', async ({ page }) => {
