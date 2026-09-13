@@ -1,0 +1,2 @@
+'use client';
+export default function Error({reset}:{error:Error&{digest?:string};reset:()=>void}){return <main className="emptyState" style={{margin:'60px auto',maxWidth:700}}><span className="eyebrow">PRIYASA / ERROR</span><h1>Something went wrong</h1><p>Please retry. Your cart and account data remain controlled by PriyasaCore.</p><button className="button" onClick={()=>reset()}>Try again</button></main>}
