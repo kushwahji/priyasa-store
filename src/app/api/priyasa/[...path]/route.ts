@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || '').replace(/\/$/, '');
 const SESSION_COOKIE = 'priyasa_session';
 const TOKEN_COOKIE = 'priyasa_access';
@@ -31,7 +34,10 @@ function sameOrigin(request: NextRequest) {
 }
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  if (!UPSTREAM) return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured', code: 'UPSTREAM_NOT_CONFIGURED' }, { status: 500 });
+  if (!UPSTREAM) {
+    return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured on the Store server', code: 'UPSTREAM_NOT_CONFIGURED' }, { status: 500 });
+  }
+
   const method = request.method.toUpperCase();
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !sameOrigin(request)) {
     return NextResponse.json({ message: 'Cross-origin request rejected', code: 'ORIGIN_REJECTED' }, { status: 403 });
@@ -54,15 +60,28 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const body = method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : await request.arrayBuffer();
 
   try {
-    const upstream = await fetch(target, { method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    const upstream = await fetch(target, {
+      method,
+      headers,
+      body,
+      cache: 'no-store',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
+    });
     const contentType = upstream.headers.get('content-type') || 'application/json';
     const text = await upstream.text();
     let payload: any = null;
     try { payload = text ? JSON.parse(text) : null; } catch { /* preserve non-JSON upstream body */ }
+
     const normalizedPath = `/${path.join('/')}`;
     const isVerify = upstream.ok && normalizedPath === '/auth/verify-otp';
     const output = isVerify ? JSON.stringify(stripToken(payload)) : text;
-    const response = new NextResponse(output || null, { status: upstream.status, statusText: upstream.statusText, headers: { 'content-type': contentType } });
+    const response = new NextResponse(output || null, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: { 'content-type': contentType },
+    });
+
     const correlationId = upstream.headers.get('x-correlation-id');
     if (correlationId) response.headers.set('x-correlation-id', correlationId);
     if (upstream.status === 401) clearSession(response);
@@ -76,8 +95,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
     if (normalizedPath === '/auth/logout' && upstream.ok) clearSession(response);
     return response;
-  } catch {
-    return NextResponse.json({ message: 'PRIYASA Core is unavailable', code: 'UPSTREAM_UNAVAILABLE' }, { status: 502 });
+  } catch (error) {
+    console.error('[PRIYASA_PROXY_UPSTREAM_ERROR]', {
+      target,
+      method,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ message: 'PRIYASA Core could not be reached from the Store server', code: 'UPSTREAM_UNAVAILABLE' }, { status: 502 });
   }
 }
 
