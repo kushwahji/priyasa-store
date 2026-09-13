@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function Account(){return <main className="container"><section className="section"><span className="eyebrow">MY PRIYASA</span><h1>Your account</h1><p className="muted">OTP authentication, profile, addresses, orders, returns, support and notification preferences will use PriyasaCore.</p><div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:24}}><Link className="button" href="/auth/login">Sign in with OTP</Link><Link className="button" style={{background:'#282c3f'}} href="/orders">My orders</Link></div></section></main>}
