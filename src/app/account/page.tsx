@@ -1,12 +1,4 @@
 'use client';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import AuthGuard from '@/components/AuthGuard';
-import { api, clearAccessToken } from '@/lib/api';
-
-function AccountContent(){
-  const [user,setUser]=useState<any>(null);
-  useEffect(()=>{api<any>('/auth/me').then(r=>setUser(r.data||r.user||r)).catch(()=>{})},[]);
-  return <main className="accountPage"><span className="eyebrow">MY PRIYASA</span><h1>Hello{user?.name?`, ${user.name}`:''}</h1><div className="accountGrid"><Link href="/orders"><strong>My orders</strong><small>Track, cancel and return orders</small></Link><Link href="/wishlist"><strong>Wishlist</strong><small>Saved styles and favourites</small></Link><Link href="/addresses"><strong>Addresses</strong><small>Manage delivery addresses</small></Link><Link href="/support"><strong>Help & support</strong><small>Get help with your purchase</small></Link></div><button className="textButton" onClick={()=>{clearAccessToken();location.href='/'}}>Sign out</button></main>
-}
+import Link from 'next/link';import {useEffect,useState} from 'react';import AuthGuard from '@/components/AuthGuard';import {api,clearAccessToken} from '@/lib/api';
+function AccountContent(){const [user,setUser]=useState<any>(null);useEffect(()=>{api<any>('/auth/me').then(r=>setUser(r.data||r.user||r)).catch(()=>{})},[]);async function signOut(){try{await api('/auth/logout',{method:'POST',body:JSON.stringify({})})}catch{}finally{clearAccessToken();location.href='/'}}return <main className="accountPage"><span className="eyebrow">MY PRIYASA</span><h1>Hello{user?.name?`, ${user.name}`:''}</h1><div className="accountGrid"><Link href="/orders"><strong>My orders</strong><small>Track, cancel and return orders</small></Link><Link href="/wishlist"><strong>Wishlist</strong><small>Saved styles and favourites</small></Link><Link href="/addresses"><strong>Addresses</strong><small>Manage delivery addresses</small></Link><Link href="/support"><strong>Help & support</strong><small>Get help with your purchase</small></Link></div><button className="textButton" onClick={signOut}>Sign out</button></main>}
 export default function Account(){return <AuthGuard><AccountContent/></AuthGuard>}
