@@ -6,9 +6,13 @@ async function proxy(request: NextRequest) {
   try {
     if (!UPSTREAM) return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured' }, { status: 502 });
     const path = request.nextUrl.searchParams.get('path') || '';
-    const target = `${UPSTREAM}/${path.replace(/^\/+/, '')}${request.nextUrl.search ? '' : ''}`;
+    if (!path || path.includes('..')) return NextResponse.json({ message: 'Invalid Priyasa API path' }, { status: 400 });
+    const query = new URLSearchParams(request.nextUrl.searchParams);
+    query.delete('path');
+    const target = `${UPSTREAM}/${path.replace(/^\/+/, '')}${query.toString() ? `?${query}` : ''}`;
     const headers = new Headers(request.headers);
-    headers.delete('host'); headers.delete('connection'); headers.delete('content-length'); headers.set('accept', 'application/json');
+    headers.delete('host'); headers.delete('connection'); headers.delete('content-length');
+    headers.set('accept', 'application/json');
     const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer();
     const upstream = await fetch(target, { method: request.method, headers, body, redirect: 'manual', cache: 'no-store' });
     const out = new Headers();
@@ -18,4 +22,10 @@ async function proxy(request: NextRequest) {
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Unable to reach PRIYASA Core' }, { status: 502 });
   }
 }
-export const GET = proxy; export const POST = proxy; export const PUT = proxy; export const PATCH = proxy; export const DELETE = proxy; export const HEAD = proxy;
+
+export const GET = proxy;
+export const POST = proxy;
+export const PUT = proxy;
+export const PATCH = proxy;
+export const DELETE = proxy;
+export const HEAD = proxy;
