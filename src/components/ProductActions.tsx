@@ -1,3 +1,54 @@
 'use client';
-import {useState} from 'react';import {api} from '@/lib/api';
-export default function ProductActions({variantId,sizes=[],colors=[]}:{variantId:string|number;sizes?:string[];colors?:string[]}){const [size,setSize]=useState(sizes[0]||'');const [color,setColor]=useState(colors[0]||'');const [busy,setBusy]=useState<'bag'|'wishlist'|null>(null);const [message,setMessage]=useState('');async function addToBag(){if(!variantId)return setMessage('This product is currently unavailable.');if(sizes.length&&!size)return setMessage('Please select a size.');setBusy('bag');setMessage('');try{await api('/storefront/cart/items',{method:'POST',body:JSON.stringify({variant_id:variantId,quantity:1})});setMessage('Added to bag.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to add this item.')}finally{setBusy(null)}}async function addToWishlist(){if(!variantId)return setMessage('This product is currently unavailable.');setBusy('wishlist');setMessage('');try{await api('/storefront/wishlist/toggle',{method:'POST',body:JSON.stringify({variant_id:variantId})});setMessage('Wishlist updated.')}catch(e){setMessage(e instanceof Error?e.message:'Unable to update wishlist.')}finally{setBusy(null)}}return <>{sizes.length?<div className="variantBlock"><strong>Select size</strong><div className="variantRow">{sizes.map(s=><button type="button" key={s} className={size===s?'selected':''} onClick={()=>setSize(s)}>{s}</button>)}</div></div>:null}{colors.length?<div className="variantBlock"><strong>Select colour</strong><div className="variantRow">{colors.map(c=><button type="button" key={c} className={color===c?'selected':''} onClick={()=>setColor(c)}>{c}</button>)}</div></div>:null}<div className="pdpActions"><button type="button" className="button secondary" disabled={busy!==null||!variantId} onClick={addToWishlist}>{busy==='wishlist'?'SAVING…':'♡ WISHLIST'}</button><button type="button" className="button" disabled={busy!==null||!variantId} onClick={addToBag}>{busy==='bag'?'ADDING…':'ADD TO BAG'}</button></div><p className="actionMessage" role="status" aria-live="polite">{message}</p></>}
+
+import { useMemo, useState } from 'react';
+import { api } from '@/lib/api';
+
+type Variant = { id: string | number; size?: string | null; color?: string | null; price?: number; stock?: { available?: number } };
+
+export default function ProductActions({ productId, variantId, variants = [], sizes = [], colors = [] }: { productId: string | number; variantId: string | number; variants?: Variant[]; sizes?: string[]; colors?: string[] }) {
+  const [size, setSize] = useState(sizes[0] || '');
+  const [color, setColor] = useState(colors[0] || '');
+  const [quantity, setQuantity] = useState(1);
+  const [busy, setBusy] = useState<'bag' | 'wishlist' | null>(null);
+  const [message, setMessage] = useState('');
+
+  const selectedVariant = useMemo(() => {
+    if (!variants.length) return variantId;
+    const exact = variants.find(v => (!sizes.length || v.size === size) && (!colors.length || v.color === color));
+    return exact?.id || variantId;
+  }, [variants, variantId, size, color, sizes.length, colors.length]);
+
+  const selectedStock = variants.find(v => String(v.id) === String(selectedVariant))?.stock?.available;
+  const unavailable = variants.length > 0 && Number(selectedStock ?? 0) < quantity;
+
+  async function addToBag() {
+    if (!selectedVariant) return setMessage('This product is currently unavailable.');
+    if (sizes.length && !size) return setMessage('Please select a size.');
+    if (colors.length && !color) return setMessage('Please select a colour.');
+    if (unavailable) return setMessage('Selected quantity is not available.');
+    setBusy('bag'); setMessage('');
+    try {
+      await api('/storefront/cart/items', { method: 'POST', body: JSON.stringify({ variant_id: Number(selectedVariant), quantity }) });
+      setMessage('Added to bag.');
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Unable to add this item.'); }
+    finally { setBusy(null); }
+  }
+
+  async function addToWishlist() {
+    if (!selectedVariant) return setMessage('This product is currently unavailable.');
+    setBusy('wishlist'); setMessage('');
+    try {
+      await api('/storefront/wishlist/items', { method: 'POST', body: JSON.stringify({ product_id: Number(productId), variant_id: Number(selectedVariant) }) });
+      setMessage('Wishlist updated.');
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Unable to update wishlist.'); }
+    finally { setBusy(null); }
+  }
+
+  return <>
+    {sizes.length ? <div className="variantBlock"><strong>Select size</strong><div className="variantRow">{sizes.map(s => <button type="button" key={s} className={size === s ? 'selected' : ''} onClick={() => setSize(s)}>{s}</button>)}</div></div> : null}
+    {colors.length ? <div className="variantBlock"><strong>Select colour</strong><div className="variantRow">{colors.map(c => <button type="button" key={c} className={color === c ? 'selected' : ''} onClick={() => setColor(c)}>{c}</button>)}</div></div> : null}
+    <div className="variantBlock"><strong>Quantity</strong><div className="qty"><button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity(q => Math.max(1, q - 1))}>−</button><span aria-live="polite">{quantity}</span><button type="button" aria-label="Increase quantity" disabled={unavailable} onClick={() => setQuantity(q => q + 1)}>+</button></div></div>
+    <div className="pdpActions"><button type="button" className="button secondary" disabled={busy !== null || !selectedVariant} onClick={addToWishlist}>{busy === 'wishlist' ? 'SAVING…' : '♡ WISHLIST'}</button><button type="button" className="button" disabled={busy !== null || !selectedVariant || unavailable} onClick={addToBag}>{busy === 'bag' ? 'ADDING…' : 'ADD TO BAG'}</button></div>
+    <p className="actionMessage" role="status" aria-live="polite">{message}</p>
+  </>;
+}
