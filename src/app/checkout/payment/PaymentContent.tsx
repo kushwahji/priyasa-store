@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import AuthGuard from '@/components/AuthGuard';
 
 type PaymentSession = { razorpay_order_id?: string; provider_order_id?: string; order_id?: string; amount?: number | string; currency?: string; key_id?: string; razorpay_key_id?: string; payload?: { id?: string; key_id?: string; amount?: number; currency?: string } };
 
@@ -13,9 +12,6 @@ function PaymentInner() {
   const [session, setSession] = useState<PaymentSession | null>(null); const [state, setState] = useState<'loading' | 'ready' | 'opening' | 'error'>('loading'); const [message, setMessage] = useState('Preparing secure payment…');
   useEffect(() => {
     if (!order) { setState('error'); setMessage('Missing order reference.'); return; }
-    // Keep payment-order creation stable for this order. Refreshing or reopening
-    // the payment page must replay the same backend transaction instead of
-    // creating multiple provider orders.
     api<any>(`/storefront/orders/${encodeURIComponent(order)}/payment`, { method: 'POST', headers: { 'Idempotency-Key': `payment-order-${order}` }, body: JSON.stringify({}) }).then(r => {
       const p: PaymentSession = r.data?.payment || r.data || r.payment || r;
       const s = { ...p, razorpay_order_id: p.razorpay_order_id || p.provider_order_id || p.payload?.id || p.order_id, key_id: p.key_id || p.razorpay_key_id || p.payload?.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID };
@@ -31,7 +27,12 @@ function PaymentInner() {
       await new Promise<void>((resolve, reject) => { const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]'); if (existing) return resolve(); const s = document.createElement('script'); s.src = 'https://checkout.razorpay.com/v1/checkout.js'; s.onload = () => resolve(); s.onerror = () => reject(new Error('Unable to load Razorpay checkout.')); document.body.appendChild(s); });
       const RazorpayCtor = (window as any).Razorpay; if (!RazorpayCtor) throw new Error('Razorpay checkout is unavailable.');
       const amountRupees = Number(session.amount || 0); if (!Number.isFinite(amountRupees) || amountRupees <= 0) throw new Error('Invalid payment amount returned by PriyasaCore.');
-      const rzp = new RazorpayCtor({ key: session.key_id, amount: Math.round(amountRupees * 100), currency: session.currency || 'INR', name: 'PRIYASA', description: `Order #${order}`, order_id: session.razorpay_order_id, handler: async (response: any) => { try { await api(`/storefront/orders/${encodeURIComponent(order)}/payment/capture`, { method: 'POST', body: JSON.stringify({ provider_payment_id: response.razorpay_payment_id, payload: { razorpay_order_id: response.razorpay_order_id, razorpay_signature: response.razorpay_signature } }) }); window.location.href = `/checkout/payment/return?order=${encodeURIComponent(order)}`; } catch (e) { setState('error'); setMessage(e instanceof Error ? e.message : 'Payment verification failed. Please check your order status.'); } }, modal: { ondismiss: () => { setState('ready'); setMessage('Payment window closed. Your order has not been marked paid.'); } }, prefill: {} });
+      const rzp = new RazorpayCtor({ key: session.key_id, amount: Math.round(amountRupees * 100), currency: session.currency || 'INR', name: 'PRIYASA', description: `Order #${order}`, order_id: session.razorpay_order_id, handler: async (response: any) => { try {
+        const paymentId = String(response?.razorpay_payment_id || '');
+        if (!paymentId || !response?.razorpay_order_id || !response?.razorpay_signature) throw new Error('Razorpay returned an incomplete verification payload.');
+        await api(`/storefront/orders/${encodeURIComponent(order)}/payment/capture`, { method: 'POST', headers: { 'Idempotency-Key': `payment-capture-${order}-${paymentId}` }, body: JSON.stringify({ provider_payment_id: paymentId, payload: { razorpay_order_id: response.razorpay_order_id, razorpay_signature: response.razorpay_signature } }) });
+        window.location.href = `/checkout/payment/return?order=${encodeURIComponent(order)}`;
+      } catch (e) { setState('error'); setMessage(e instanceof Error ? e.message : 'Payment verification failed. Please check your order status.'); } }, modal: { ondismiss: () => { setState('ready'); setMessage('Payment window closed. Your order has not been marked paid.'); } }, prefill: {} });
       rzp.on('payment.failed', () => { setState('error'); setMessage('Payment failed. Your order remains unconfirmed until PriyasaCore receives a successful payment status.'); }); rzp.open();
     } catch (e) { setState('error'); setMessage(e instanceof Error ? e.message : 'Unable to open payment'); }
   }
