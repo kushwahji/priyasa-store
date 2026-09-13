@@ -13,7 +13,10 @@ function PaymentInner() {
   const [session, setSession] = useState<PaymentSession | null>(null); const [state, setState] = useState<'loading' | 'ready' | 'opening' | 'error'>('loading'); const [message, setMessage] = useState('Preparing secure payment…');
   useEffect(() => {
     if (!order) { setState('error'); setMessage('Missing order reference.'); return; }
-    api<any>(`/storefront/orders/${encodeURIComponent(order)}/payment`, { method: 'POST', body: JSON.stringify({}) }).then(r => {
+    // Keep payment-order creation stable for this order. Refreshing or reopening
+    // the payment page must replay the same backend transaction instead of
+    // creating multiple provider orders.
+    api<any>(`/storefront/orders/${encodeURIComponent(order)}/payment`, { method: 'POST', headers: { 'Idempotency-Key': `payment-order-${order}` }, body: JSON.stringify({}) }).then(r => {
       const p: PaymentSession = r.data?.payment || r.data || r.payment || r;
       const s = { ...p, razorpay_order_id: p.razorpay_order_id || p.provider_order_id || p.payload?.id || p.order_id, key_id: p.key_id || p.razorpay_key_id || p.payload?.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID };
       if (!s.razorpay_order_id) throw new Error('PriyasaCore did not return the Razorpay order id.');
