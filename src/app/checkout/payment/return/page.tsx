@@ -1,0 +1,6 @@
+'use client';
+import Link from 'next/link';
+import {useSearchParams} from 'next/navigation';
+import {useEffect,useState} from 'react';
+import {api} from '@/lib/api';
+export default function PaymentReturn(){const q=useSearchParams();const order=q.get('order');const [status,setStatus]=useState('checking');useEffect(()=>{if(!order){setStatus('missing');return}api<any>(`/orders/${encodeURIComponent(order)}`).then(r=>{const s=String(r.data?.payment_status||r.data?.status||r.status||'pending').toLowerCase();setStatus(s)}).catch(()=>setStatus('unknown'))},[order]);const paid=['paid','confirmed','completed','success'].includes(status);return <main className="checkoutPage"><section className="emptyState"><span className="eyebrow">PRIYASA / ORDER</span><h1>{paid?'Order confirmed':status==='pending'||status==='checking'?'Confirming your order':'Payment needs attention'}</h1><p>{paid?'Your payment has been confirmed.':status==='pending'||status==='checking'?'We are checking the authoritative order status. Do not retry payment until this check completes.':'We could not confirm a successful payment. Please check your order status before trying again.'}</p><div className="heroActions">{order&&<Link className="button" href={`/orders/${order}`}>View order</Link>}<Link className="button secondary" href="/shop">Continue shopping</Link></div></section></main>}
