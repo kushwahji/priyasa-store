@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || '').replace(/\/$/, '');
 const SESSION_COOKIE = 'priyasa_session';
 const TOKEN_COOKIE = 'priyasa_access';
+const COOKIE_OPTIONS = { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, maxAge: 60 * 60 * 24 * 30 };
 const ALLOWED_HEADERS = ['accept', 'authorization', 'content-type', 'idempotency-key', 'x-correlation-id', 'x-request-id'];
 
 function extractToken(body: any, authorizationHeader?: string | null) {
@@ -20,10 +21,8 @@ function stripToken(body: any) {
 }
 
 function clearSession(response: NextResponse) {
-  response.cookies.set(SESSION_COOKIE, '', { path: '/', maxAge: 0 });
-  response.cookies.set(TOKEN_COOKIE, '', {
-    path: '/', maxAge: 0, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
-  });
+  response.cookies.set(SESSION_COOKIE, '', { ...COOKIE_OPTIONS, maxAge: 0 });
+  response.cookies.set(TOKEN_COOKIE, '', { ...COOKIE_OPTIONS, maxAge: 0 });
 }
 
 function sameOrigin(request: NextRequest) {
@@ -49,17 +48,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
-
   const cookieToken = request.cookies.get(TOKEN_COOKIE)?.value;
   if (cookieToken) headers.set('authorization', `Bearer ${cookieToken}`);
 
   const body = method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : await request.arrayBuffer();
 
   try {
-    const upstream = await fetch(target, {
-      method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000),
-    });
-
+    const upstream = await fetch(target, { method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000) });
     const contentType = upstream.headers.get('content-type') || 'application/json';
     const text = await upstream.text();
     let payload: any = null;
@@ -67,13 +62,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const normalizedPath = `/${path.join('/')}`;
     const isVerify = upstream.ok && normalizedPath === '/auth/verify-otp';
     const output = isVerify ? JSON.stringify(stripToken(payload)) : text;
-
-    const response = new NextResponse(output || null, {
-      status: upstream.status,
-      statusText: upstream.statusText,
-      headers: { 'content-type': contentType },
-    });
-
+    const response = new NextResponse(output || null, { status: upstream.status, statusText: upstream.statusText, headers: { 'content-type': contentType } });
     const correlationId = upstream.headers.get('x-correlation-id');
     if (correlationId) response.headers.set('x-correlation-id', correlationId);
     if (upstream.status === 401) clearSession(response);
@@ -81,15 +70,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (isVerify) {
       const accessToken = extractToken(payload, upstream.headers.get('authorization'));
       if (accessToken) {
-        response.cookies.set(TOKEN_COOKIE, accessToken, {
-          path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30,
-        });
-        response.cookies.set(SESSION_COOKIE, '1', {
-          path: '/', httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30,
-        });
+        response.cookies.set(TOKEN_COOKIE, accessToken, COOKIE_OPTIONS);
+        response.cookies.set(SESSION_COOKIE, '1', COOKIE_OPTIONS);
       }
     }
-
     if (normalizedPath === '/auth/logout' && upstream.ok) clearSession(response);
     return response;
   } catch {
