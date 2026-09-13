@@ -4,28 +4,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
+import { api } from '@/lib/api';
 
 function InvoiceInner() {
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<any>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true); setError('');
-    try {
-      const r = await api<any>(`/storefront/orders/${encodeURIComponent(id)}/invoice`);
-      setInvoice(r.data || r);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load invoice'); }
+    try { const r = await api<any>(`/storefront/orders/${encodeURIComponent(id)}/invoice`); setInvoice(r.data || r); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load invoice'); }
     finally { setLoading(false); }
   }, [id]);
-
   useEffect(() => { void load(); }, [load]);
   const items = Array.isArray(invoice?.lines) ? invoice.lines : (Array.isArray(invoice?.items) ? invoice.items : (Array.isArray(invoice?.line_items) ? invoice.line_items : []));
   const money = (value: unknown) => `₹${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const address = invoice?.shipping_address || {};
-
   return <main className="accountPage">
     <div className="sectionHead"><div><span className="eyebrow">PRIYASA / INVOICE</span><h1>Invoice</h1></div><Link className="textLink" href={`/orders/${encodeURIComponent(id)}`}>← Order</Link></div>
     {loading ? <div className="emptyState"><p className="muted">Loading invoice…</p></div> : error ? <div className="emptyState"><div className="formError" role="alert">{error}</div><button className="button" onClick={() => void load()}>Retry</button></div> : <div className="checkoutCard invoiceCard">
