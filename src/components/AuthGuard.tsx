@@ -2,55 +2,29 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import NotificationEnrollment from '@/components/NotificationEnrollment';
 
-/**
- * Uses a same-origin session hint because the access token is HttpOnly.
- * PriyasaCore remains authoritative; any protected API 401 is handled by the
- * API client and redirects the customer back to login.
- */
+type SessionState = 'loading' | 'authenticated' | 'guest' | 'unavailable';
+
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<'loading' | 'authenticated' | 'guest'>('loading');
+  const [state, setState] = useState<SessionState>('loading');
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api/session', { credentials: 'include', cache: 'no-store' })
-      .then(async response => {
-        if (!response.ok) throw new Error('session check failed');
-        return response.json() as Promise<{ authenticated?: boolean }>;
-      })
-      .then(data => {
-        if (active) setState(data.authenticated ? 'authenticated' : 'guest');
-      })
-      .catch(() => {
-        if (active) setState('guest');
-      });
-    return () => { active = false; };
-  }, []);
+  const check = async () => {
+    setState('loading');
+    try {
+      const response = await fetch('/api/session', { credentials: 'include', cache: 'no-store', headers: { Accept: 'application/json' } });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.authenticated === true) setState('authenticated');
+      else if (response.status === 401 || (response.ok && data.authenticated === false)) setState('guest');
+      else setState('unavailable');
+    } catch { setState('unavailable'); }
+  };
 
-  if (state === 'loading') {
-    return (
-      <main className="accountPage">
-        <section className="authCard">
-          <p className="muted">Checking your PRIYASA session…</p>
-        </section>
-      </main>
-    );
-  }
+  useEffect(() => { void check(); }, []);
 
-  if (state === 'guest') {
-    return (
-      <main className="accountPage">
-        <section className="emptyState">
-          <span className="eyebrow">PRIYASA ACCOUNT</span>
-          <h1>Sign in to continue</h1>
-          <p>Sign in once to access your account, orders, wishlist and checkout.</p>
-          <Link className="button" href={`/auth/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
-            Sign in with OTP
-          </Link>
-        </section>
-      </main>
-    );
-  }
+  if (state === 'loading') return <main className="accountPage"><section className="authCard"><p className="muted">Checking your PRIYASA session…</p></section></main>;
+  if (state === 'unavailable') return <main className="accountPage"><section className="emptyState"><span className="eyebrow">PRIYASA ACCOUNT</span><h1>Session check unavailable</h1><p>We could not verify your secure session right now. Your login has not been discarded.</p><button className="button" type="button" onClick={() => void check()}>Try again</button></section></main>;
+  if (state === 'guest') return <main className="accountPage"><section className="emptyState"><span className="eyebrow">PRIYASA ACCOUNT</span><h1>Sign in to continue</h1><p>Sign in once to access your account, orders, wishlist and checkout.</p><Link className="button" href={`/auth/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Sign in with OTP</Link></section></main>;
 
-  return <>{children}</>;
+  return <><NotificationEnrollment />{children}</>;
 }
