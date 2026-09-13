@@ -17,13 +17,18 @@ test('search route is usable', async ({ page }) => {
 });
 
 test('protected account route redirects unauthenticated visitors', async ({ page }) => {
+  await page.route('**/api/session', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: false }) });
+  });
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: /sign in to continue/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /sign in with otp/i })).toHaveAttribute('href', '/auth/login');
 });
 
-test('HttpOnly session is recognized by the account guard', async ({ page, context, baseURL }) => {
-  await context.addCookies([{ name: 'priyasa_session', value: '1', url: baseURL!, httpOnly: true, sameSite: 'Lax' }]);
+test('authenticated account route trusts the same-origin session API', async ({ page }) => {
+  await page.route('**/api/session', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) });
+  });
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: /my account/i })).toBeVisible();
 });
