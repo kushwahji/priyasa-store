@@ -61,9 +61,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const upstream = await fetch(target, { method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal: controller.signal });
     const responseBody = await upstream.arrayBuffer();
     const contentType = upstream.headers.get('content-type');
-    const responseHeaders = new Headers();
+    const responseHeaders = new Headers({ 'Cache-Control': 'no-store' });
     if (contentType) responseHeaders.set('content-type', contentType);
-    for (const name of ['cache-control', 'etag', 'x-request-id', 'x-correlation-id']) {
+    for (const name of ['etag', 'x-request-id', 'x-correlation-id']) {
       const value = upstream.headers.get(name);
       if (value) responseHeaders.set(name, value);
     }
