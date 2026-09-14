@@ -26,8 +26,14 @@ export default function Checkout() {
   const loadQuote = useCallback(async (code = coupon) => {
     try {
       const r = await api<any>('/storefront/checkout/validate', { method: 'POST', body: JSON.stringify({ coupon_code: code || '' }) });
-      setQuote(quoteOf(r));
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to validate your bag.'); }
+      const nextQuote = quoteOf(r);
+      setQuote(nextQuote);
+      return nextQuote;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unable to validate your bag.';
+      setError(message);
+      throw e;
+    }
   }, [coupon]);
 
   useEffect(() => {
@@ -48,7 +54,7 @@ export default function Checkout() {
   async function applyCoupon() {
     setError(''); setMessage('');
     try { await loadQuote(coupon.trim().toUpperCase()); setMessage(coupon ? 'Coupon checked against the current cart.' : 'Coupon removed.'); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Coupon could not be applied.'); }
+    catch { /* loadQuote already exposes the API error */ }
   }
 
   async function placeOrder() {
