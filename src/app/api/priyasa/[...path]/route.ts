@@ -68,7 +68,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if (value) responseHeaders.set(name, value);
     }
 
-    let outgoingBody = responseBody;
+    let outgoingBody: BodyInit = responseBody;
     let parsedBody: unknown = null;
     if (contentType?.includes('application/json')) {
       try { parsedBody = JSON.parse(new TextDecoder().decode(responseBody)); } catch { parsedBody = null; }
@@ -77,7 +77,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     let token: string | null = null;
     if (route === 'auth/verify-otp' && upstream.ok && parsedBody !== null) {
       token = extractToken(parsedBody);
-      outgoingBody = new TextEncoder().encode(JSON.stringify(withoutToken(parsedBody))).buffer;
+      outgoingBody = JSON.stringify(withoutToken(parsedBody));
     }
 
     const response = new NextResponse(outgoingBody, { status: upstream.status, statusText: upstream.statusText, headers: responseHeaders });
