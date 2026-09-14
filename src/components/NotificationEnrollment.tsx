@@ -37,6 +37,7 @@ async function registerToken(token: string, deviceType: 'web' | 'android', devic
 export default function NotificationEnrollment() {
   const [visible, setVisible] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState('');
   const messagingRef = useRef<any>(null);
+  const foregroundBoundRef = useRef(false);
 
   const register = useCallback(async (force = false) => {
     if (!configured() || typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) return false;
@@ -50,7 +51,7 @@ export default function NotificationEnrollment() {
       const registration = await navigator.serviceWorker.register('/api/firebase-messaging-sw', { scope: '/' });
       const token = await getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY, serviceWorkerRegistration: registration });
       await registerToken(token, 'web', {}, force);
-      if (!messagingRef.current.__priyasaForegroundBound) {
+      if (!foregroundBoundRef.current) {
         onMessage(messaging, payload => {
           const notification = payload.notification || {};
           const title = notification.title || 'PRIYASA';
@@ -58,7 +59,7 @@ export default function NotificationEnrollment() {
           window.dispatchEvent(new CustomEvent('priyasa:notification-received', { detail: { title, body, data: payload.data || {} } }));
           if (Notification.permission === 'granted') new Notification(title, { body, tag: 'priyasa-notification' });
         });
-        messagingRef.current.__priyasaForegroundBound = true;
+        foregroundBoundRef.current = true;
       }
       localStorage.setItem(PROMPT_KEY, '1'); setVisible(false); return true;
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Unable to enable notifications right now.'); return false; }
