@@ -61,6 +61,17 @@ test.describe('PRIYASA storefront smoke', () => {
     expect(response.status()).toBeLessThan(500);
   });
 
+  test('authenticated PDP wishlist uses the canonical toggle contract', async ({ page }) => {
+    await requireSession(page);
+    const slug = process.env.PRIYASA_E2E_PRODUCT_SLUG;
+    test.skip(!slug, 'Set PRIYASA_E2E_PRODUCT_SLUG to exercise an authenticated PDP journey.');
+    await page.goto(`/product/${encodeURIComponent(slug!)}`);
+    const wishlist = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/wishlist/toggle') && r.request().method() === 'POST');
+    await page.getByRole('button', { name: /WISHLIST/ }).click();
+    const response = await wishlist;
+    expect(response.status()).toBeLessThan(500);
+  });
+
   test('payment page checks authoritative Core payment state first', async ({ page }) => {
     await requireSession(page);
     const orderId = process.env.PRIYASA_E2E_PAYMENT_ORDER_ID;
