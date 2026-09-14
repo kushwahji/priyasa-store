@@ -50,12 +50,38 @@ export default function OrderDetail() {
   async function reorder() {
     setReorderBusy(true); setError(''); setMessage('');
     try {
+      // Core's reorder endpoint returns currently active order items; it does not mutate
+      // the customer's cart. Add each returned variant through the authoritative cart API.
       const response = await api<any>(`/orders/${encodeURIComponent(id)}/reorder`);
       const data = response?.data ?? response ?? {};
-      const cart = data.cart ?? data;
-      if (data.checkout_url || data.redirect_url) window.location.assign(data.checkout_url || data.redirect_url);
-      else if (cart?.id || cart?.items || response) setMessage('Items from this order were added to your bag.');
-      else setMessage('Reorder is not available for this order.');
+      const items = Array.isArray(data.items) ? data.items : [];
+      const redirect = data.checkout_url || data.redirect_url;
+      if (redirect) { window.location.assign(redirect); return; }
+      if (!items.length) { setMessage('None of the items from this order are currently available to buy again.'); return; }
+
+      let added = 0;
+      let failed = 0;
+      for (const item of items) {
+        const variantId = item?.variant_id;
+        const quantity = Math.max(1, Math.min(20, Number(item?.quantity ?? 1)));
+        if (!variantId) { failed += 1; continue; }
+        try {
+          await api('/storefront/cart/items', {
+            method: 'POST',
+            body: JSON.stringify({ variant_id: Number(variantId), quantity }),
+          });
+          added += 1;
+        } catch { failed += 1; }
+      }
+
+      if (!added) {
+        throw new Error('None of the items from this order could be added to your bag. They may be out of stock.');
+      }
+      if (failed) {
+        setMessage(`${added} ${added === 1 ? 'item was' : 'items were'} added to your bag. ${failed} ${failed === 1 ? 'item was' : 'items were'} unavailable.`);
+      } else {
+        window.location.assign('/cart');
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to reorder this order.'); }
     finally { setReorderBusy(false); }
   }
