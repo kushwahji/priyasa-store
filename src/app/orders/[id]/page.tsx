@@ -51,6 +51,7 @@ export default function OrderDetail() {
   const cancellable = !['cancelled','delivered','returned','refunded','completed'].includes(status) && order.cancellable !== false;
   const terminal = ['cancelled','delivered','returned','refunded','completed'].includes(status);
   const paymentSettled = ['paid','captured','success','successful'].includes(paymentStatus);
+  const returnRequestable = ['delivered', 'completed'].includes(status) && order.returnable !== false;
 
   return <main className="accountPage">
     <div className="sectionHead"><div><span className="eyebrow">PRIYASA / ORDER</span><h1>#{order.order_number || order.id || id}</h1><p className="muted">{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Order details'}</p></div><Link className="textLink" href="/orders">← All orders</Link></div>
@@ -68,7 +69,13 @@ export default function OrderDetail() {
         <div className="checkoutCard"><span className="eyebrow">ORDER TIMELINE</span><div className="timeline"><div><b>Order placed</b><span>{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Confirmed by PRIYASA'}</span></div><div className={terminal ? 'done' : ''}><b>{label(status)}</b><span>Current order status</span></div></div></div>
         {address && <div className="checkoutCard"><span className="eyebrow">DELIVERY ADDRESS</span><p><strong>{address.name || address.full_name || 'Delivery address'}</strong><br />{[address.address_line1 || address.line1, address.address_line2 || address.line2, address.city, address.state, address.postal_code || address.pincode].filter(Boolean).join(', ')}</p></div>}
       </section>
-      <aside className="summary"><span className="eyebrow">PRICE DETAILS</span><div><span>Subtotal</span><b>{money(order.subtotal)}</b></div>{Number(order.discount_total || order.discount) > 0 && <div><span>Discount</span><b>-{money(order.discount_total || order.discount)}</b></div>}<div><span>Shipping</span><b>{Number(order.shipping_total || order.shipping) ? money(order.shipping_total || order.shipping) : 'FREE'}</b></div>{Number(order.tax_total || order.tax) > 0 && <div><span>Tax</span><b>{money(order.tax_total || order.tax)}</b></div>}<hr/><div><strong>Total</strong><strong>{money(total)}</strong></div>{cancellable && <button className="button secondary" type="button" disabled={actionBusy} onClick={() => void cancelOrder()}>{actionBusy ? 'Cancelling…' : 'Cancel order'}</button>}{order.id && <><Link className="button" href={`/orders/${encodeURIComponent(String(order.id))}/tracking`}>Track order</Link><Link className="textLink" href={`/orders/${encodeURIComponent(String(order.id))}/invoice`}>View invoice →</Link></>}</aside>
+      <aside className="summary">
+        <span className="eyebrow">PRICE DETAILS</span>
+        <div><span>Subtotal</span><b>{money(order.subtotal)}</b></div>{Number(order.discount_total || order.discount) > 0 && <div><span>Discount</span><b>-{money(order.discount_total || order.discount)}</b></div>}<div><span>Shipping</span><b>{Number(order.shipping_total || order.shipping) ? money(order.shipping_total || order.shipping) : 'FREE'}</b></div>{Number(order.tax_total || order.tax) > 0 && <div><span>Tax</span><b>{money(order.tax_total || order.tax)}</b></div>}<hr/><div><strong>Total</strong><strong>{money(total)}</strong></div>
+        {cancellable && <button className="button secondary" type="button" disabled={actionBusy} onClick={() => void cancelOrder()}>{actionBusy ? 'Cancelling…' : 'Cancel order'}</button>}
+        {returnRequestable && <Link className="button secondary" href={`/returns/request?order=${encodeURIComponent(String(order.id || id))}`}>Request return</Link>}
+        {order.id && <><Link className="button" href={`/orders/${encodeURIComponent(String(order.id))}/tracking`}>Track order</Link><Link className="textLink" href={`/orders/${encodeURIComponent(String(order.id))}/invoice`}>View invoice →</Link></>}
+      </aside>
     </div>
   </main>;
 }
