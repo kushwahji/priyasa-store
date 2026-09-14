@@ -19,7 +19,7 @@ const securityHeaders = [
       "font-src 'self' data: https:",
       "style-src 'self' 'unsafe-inline' https:",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
-      "connect-src 'self' https:",
+      "connect-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
       "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
       "worker-src 'self' blob:",
       "upgrade-insecure-requests",
