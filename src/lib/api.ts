@@ -1,4 +1,4 @@
-const SERVER_BASE=(process.env.PRIYASA_API_BASE_URL||process.env.PRIYASA_API_URL||'').replace(/\/$/,'');
+const SERVER_BASE=(process.env.PRIYASA_API_BASE_URL||process.env.PRIYASA_API_URL||process.env.NEXT_PUBLIC_PRIYASA_API_URL||'http://localhost:8000/api/v1').replace(/\/$/,'');
 const BROWSER_BASE='/api/priyasa';
 const SESSION_MARKER='priyasa_session_active';
 
