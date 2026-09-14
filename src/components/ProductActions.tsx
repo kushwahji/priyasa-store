@@ -44,9 +44,7 @@ export default function ProductActions({
   }, [variants, variantId, size, color]);
 
   const selected = variants.find((v) => String(v.id) === String(selectedVariant));
-  const available = selected
-    ? Number(selected.inventory?.available ?? 0)
-    : Boolean(selectedVariant);
+  const available = selected ? Number(selected.inventory?.available ?? 0) : 0;
   const unavailable = !selectedVariant || (Boolean(selected) && available <= 0);
 
   async function addToBag(redirect = false) {
