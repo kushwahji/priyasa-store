@@ -8,14 +8,21 @@ type RazorpayResponse = { razorpay_payment_id?: string; razorpay_order_id?: stri
 type WindowWithRazorpay = Window & { Razorpay?: new (options: Record<string, any>) => { open: () => void } };
 function unwrap(r: any) { return r?.data ?? r ?? {}; }
 function statusValues(v: any): string[] {
-  const values = [v?.payment_status, v?.status, v?.payment?.status, v?.payment?.payment_status, ...(Array.isArray(v?.paymentTransactions) ? v.paymentTransactions.map((x: any) => x?.status) : [])];
+  const values = [v?.payment_status, v?.status, v?.payment?.status, v?.payment?.payment_status];
   return values.map(x => String(x ?? '').toLowerCase().trim()).filter(Boolean);
 }
+function transactionStatuses(v: any): string[] {
+  return Array.isArray(v?.paymentTransactions) ? v.paymentTransactions.map((x: any) => String(x?.status ?? '').toLowerCase().trim()).filter(Boolean) : [];
+}
 function isSettled(v: any): boolean {
-  return statusValues(v).some(s => ['paid', 'captured', 'success', 'successful', 'completed'].includes(s));
+  // Prefer the authoritative order/payment status. A historical successful transaction
+  // must not make a currently-pending order look paid in the browser.
+  const primary = statusValues(v);
+  if (primary.length) return primary.some(s => ['paid', 'captured', 'success', 'successful', 'completed'].includes(s));
+  return transactionStatuses(v).some(s => ['paid', 'captured', 'success', 'successful', 'completed'].includes(s));
 }
 function isFailed(v: any): boolean {
-  return statusValues(v).some(s => ['failed', 'cancelled', 'refunded'].includes(s));
+  return [...statusValues(v), ...transactionStatuses(v)].some(s => ['failed', 'cancelled', 'refunded'].includes(s));
 }
 function loadScript(src: string) { return new Promise<boolean>((resolve) => { if (document.querySelector(`script[src="${src}"]`)) return resolve(true); const s = document.createElement('script'); s.src = src; s.async = true; s.onload = () => resolve(true); s.onerror = () => resolve(false); document.body.appendChild(s); }); }
 
