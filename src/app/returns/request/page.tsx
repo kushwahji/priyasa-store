@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 
 const REASONS = [
@@ -14,13 +14,25 @@ const REASONS = [
   'Other',
 ];
 
-function unwrap(r: any) { return r?.data?.order ?? r?.data ?? r?.order ?? r ?? {}; }
+type ApiRecord = Record<string, unknown>;
+type OrderItem = ApiRecord & { id?: string | number; quantity?: number };
+type Order = ApiRecord & { id?: string | number; order_number?: string | number; items?: OrderItem[]; line_items?: OrderItem[] };
 
-export default function ReturnRequestPage() {
+function asRecord(value: unknown): ApiRecord {
+  return value && typeof value === 'object' ? value as ApiRecord : {};
+}
+
+function unwrap(value: unknown): Order {
+  const root = asRecord(value);
+  const data = asRecord(root.data);
+  return asRecord(data.order ?? root.order ?? root) as Order;
+}
+
+function ReturnRequestContent() {
   const search = useSearchParams();
   const router = useRouter();
   const orderId = search.get('order') || '';
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [reason, setReason] = useState(REASONS[0]);
   const [details, setDetails] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,7 +42,7 @@ export default function ReturnRequestPage() {
   const load = useCallback(async () => {
     if (!orderId) { setLoading(false); return; }
     setLoading(true); setError('');
-    try { setOrder(unwrap(await api<any>(`/storefront/orders/${encodeURIComponent(orderId)}`))); }
+    try { setOrder(unwrap(await api<unknown>(`/storefront/orders/${encodeURIComponent(orderId)}`))); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load this order.'); }
     finally { setLoading(false); }
   }, [orderId]);
@@ -47,12 +59,14 @@ export default function ReturnRequestPage() {
         reason: reason === 'Other' && details.trim() ? details.trim() : reason,
         ...(details.trim() && reason !== 'Other' ? { metadata: { customer_note: details.trim() } } : {}),
       };
-      const response = await api<any>(`/storefront/orders/${encodeURIComponent(orderId)}/returns`, {
+      const response = await api<unknown>(`/storefront/orders/${encodeURIComponent(orderId)}/returns`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      const created = response?.data?.return ?? response?.return ?? response?.data ?? response;
-      const returnId = created?.id || created?.return_id;
+      const root = asRecord(response);
+      const data = asRecord(root.data);
+      const created = asRecord(data.return ?? root.return ?? root.data ?? root);
+      const returnId = created.id ?? created.return_id;
       router.replace(returnId ? `/returns/${encodeURIComponent(String(returnId))}` : '/returns');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to submit the return request.');
@@ -76,8 +90,8 @@ export default function ReturnRequestPage() {
       <section>
         <div className="checkoutCard">
           <span className="eyebrow">ORDER ITEMS</span>
-          {items.length ? items.map((item: any, i: number) => <article className="orderLine" key={String(item.id || i)}>
-            <div><strong>{item.product_name || item.name || item.product?.name || 'PRIYASA product'}</strong><small>{item.variant_label || item.size || item.variant?.label || 'Standard'} · Qty {item.quantity || 1}</small></div>
+          {items.length ? items.map((item, i) => <article className="orderLine" key={String(item.id || i)}>
+            <div><strong>{String(item.product_name || item.name || asRecord(item.product).name || 'PRIYASA product')}</strong><small>{String(item.variant_label || item.size || asRecord(item.variant).label || 'Standard')} · Qty {Number(item.quantity || 1)}</small></div>
           </article>) : <p className="muted">Order items are not available in this response.</p>}
         </div>
 
@@ -107,4 +121,8 @@ export default function ReturnRequestPage() {
       </aside>
     </div>
   </main>;
+}
+
+export default function ReturnRequestPage() {
+  return <Suspense fallback={<main className="accountPage"><div className="emptyState"><h2>Loading return request…</h2></div></main>}><ReturnRequestContent /></Suspense>;
 }
