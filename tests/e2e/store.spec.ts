@@ -1,19 +1,52 @@
 import { test, expect } from '@playwright/test';
 
-test('home and core commerce navigation render on desktop and mobile', async ({ page }) => {
-  await page.goto('/');
-  await expect(page).toHaveTitle(/PRIYASA/);
-  await expect(page.getByRole('link', { name: /shop new arrivals/i })).toBeVisible();
-  await page.getByRole('link', { name: /shop new arrivals/i }).click();
-  await expect(page).toHaveURL(/\/shop/);
-  await expect(page.getByRole('heading', { name: /all styles/i })).toBeVisible();
-});
+test.describe('PRIYASA storefront smoke', () => {
+  test('home is CMS-driven and responsive', async ({ page }) => {
+    const home = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/home') && r.request().method() === 'GET');
+    await page.goto('/');
+    await expect(page).toHaveTitle(/PRIYASA/);
+    await home;
+    await expect(page.getByRole('heading', { name: 'Style It Your Way' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New Arrivals' })).toBeVisible();
+  });
 
-test('search route is usable', async ({ page }) => {
-  await page.goto('/search');
-  await expect(page.getByRole('heading', { name: /find your next priyasa edit/i })).toBeVisible();
-  const searchInput = page.locator('input[aria-label="Search products"]').first();
-  await expect(searchInput).toBeVisible();
-  await searchInput.fill('kurti');
-  await expect(searchInput).toHaveValue('kurti');
+  test('catalog and PDP are usable', async ({ page }) => {
+    await page.goto('/shop');
+    await expect(page.locator('.productCard').first()).toBeVisible();
+    await page.locator('.productCard').first().click();
+    await expect(page).toHaveURL(/\/product\//);
+    await expect(page.getByText('PRIYASA Everyday Kurti')).toBeVisible();
+  });
+
+  test('header search works', async ({ page }) => {
+    await page.goto('/');
+    const search = page.locator('header input[aria-label="Search products"]');
+    await search.fill('kurti');
+    await search.press('Enter');
+    await expect(page).toHaveURL(/\/search\?q=kurti/);
+  });
+
+  test('mobile drawer and bottom navigation work', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await expect(page.locator('.mobileMenu')).toBeVisible();
+    await page.getByRole('link', { name: 'NEW IN' }).first().click();
+    await expect(page).toHaveURL(/\/shop\?sort=newest/);
+    await expect(page.locator('.bottomNav')).toBeVisible();
+  });
+
+  test('OTP login flow establishes the session', async ({ page }) => {
+    await page.goto('/auth/login?next=/account');
+    await page.getByLabel('Mobile number').fill('9999999999');
+    await page.getByRole('button', { name: 'Send OTP' }).click();
+    await expect(page.getByLabel('OTP')).toBeVisible();
+    await page.getByLabel('OTP').fill('123456');
+    await page.getByRole('button', { name: 'Verify & continue' }).click();
+    await expect(page).toHaveURL(/\/account/);
+  });
+
+  test('guest protected route returns to login', async ({ page }) => {
+    await page.goto('/cart');
+    await expect(page).toHaveURL(/\/auth\/login\?next=/);
+  });
 });
