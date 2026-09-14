@@ -1,0 +1,14 @@
+/* Final responsive pass: keeps CMS/API content dynamic while adapting layout to viewport. */
+.dynamicHero{height:min(48vw,620px);min-height:420px}
+.dynamicServices{grid-template-columns:minmax(240px,1fr) minmax(0,2fr)}
+@media (max-width:1100px){
+  .headerInner{padding-inline:18px}.headerActions{gap:12px}.dynamicHero{height:min(58vw,540px);min-height:390px}.section{padding-inline:20px}.dynamicProducts.isGrid .homeProductRail{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:700px){
+  .dynamicHero{height:clamp(285px,78vw,390px);min-height:285px;max-height:390px;background-size:cover;background-position:center}
+  .dynamicHeroCopy{padding:18px 16px 48px}.dynamicHero h1{font-size:clamp(28px,8.5vw,40px);max-width:90%;margin:6px 0 8px}.dynamicHero p{font-size:11px;max-width:92%;margin:0 0 10px}.dynamicHero .button{min-height:36px;padding:8px 15px}.heroDots{bottom:14px;left:16px}
+  .dynamicServices{display:block;padding:0}.servicePrimary{padding:11px 14px}.serviceSecondary{padding:9px 8px}.serviceSecondary>div{padding:3px 7px}.dynamicServices strong{font-size:10px}.dynamicServices small{font-size:8px}
+  .section{padding:27px 12px}.dynamicEditorialCard{min-height:195px}.dynamicEditorialCard:first-child{min-height:225px}.dynamicProducts .sectionHead{align-items:center}.homeProductRail{grid-auto-columns:calc(47% - 3px)}
+  .authPage{position:relative;min-height:calc(100svh - 86px);padding:0!important;background:rgba(40,44,63,.16)}.authBackdrop{position:fixed;inset:86px 0 68px;background:rgba(25,25,30,.38);z-index:550}.authCard{position:fixed;z-index:600;left:0;right:0;bottom:0;width:100%;max-width:none;margin:0;padding:14px 18px calc(20px + env(safe-area-inset-bottom));border:0;border-top:1px solid var(--line);border-radius:20px 20px 0 0;box-shadow:0 -16px 50px rgba(40,44,63,.22);max-height:90svh;overflow:auto}.authHandle{display:block;width:38px;height:4px;border-radius:99px;background:#d5d6dc;margin:0 auto 15px}.authCard h1{font-size:29px;margin:7px 0}.authCard label{margin-top:14px}.authCard input{height:50px}.authCard>.button{min-height:48px}.authCard .textButton{min-height:34px}.authPage .bottomNav{display:none}
+}
+@media (min-width:701px){.authHandle{display:none}.authBackdrop{display:none}}
