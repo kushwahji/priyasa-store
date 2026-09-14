@@ -4,7 +4,7 @@ async function requireSession(page: Page) {
   const token = process.env.PRIYASA_E2E_ACCESS_TOKEN;
   test.skip(!token, 'Set PRIYASA_E2E_ACCESS_TOKEN for authenticated E2E journeys.');
   const url = new URL(process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000');
-  await page.context().addCookies([{ name: 'priyasa_session', value: token!, domain: url.hostname, path: '/', secure: url.protocol === 'https:' }]);
+  await page.context().addCookies([{ name: 'priyasa_session', value: token!, domain: url.hostname, path: '/', secure: url.protocol === 'https:', httpOnly: true, sameSite: 'Lax' }]);
 }
 
 test.describe('PRIYASA storefront smoke', () => {
@@ -41,21 +41,24 @@ test.describe('PRIYASA storefront smoke', () => {
     await expect(page.locator('.bottomNav')).toBeVisible();
   });
 
-  test('checkout loads Core addresses and quote before placement', async ({ page }) => {
+  test('checkout loads Core addresses before placement', async ({ page }) => {
     await requireSession(page);
-    const addresses = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/addresses') && r.request().method() === 'GET');
+    const addresses = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/addresses') && r.request().method() === 'GET');
     await page.goto('/checkout');
-    await addresses;
+    const response = await addresses;
+    expect(response.status()).toBeLessThan(500);
     await expect(page.getByText('Delivery address')).toBeVisible();
   });
 
-  test('checkout quote uses the Core P40 contract', async ({ page }) => {
+  test('checkout coupon uses the documented Core validation contract', async ({ page }) => {
     await requireSession(page);
     await page.goto('/checkout');
-    const quote = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/quote') && r.request().method() === 'POST');
-    await page.getByRole('button', { name: /Cash on Delivery/ }).click().catch(() => undefined);
-    const response = await quote.catch(() => null);
-    if (response) expect(response.status()).toBeLessThan(500);
+    await expect(page.getByText('Offers & coupon')).toBeVisible();
+    const validate = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/validate') && r.request().method() === 'POST');
+    await page.getByLabel('Coupon code').fill('');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    const response = await validate;
+    expect(response.status()).toBeLessThan(500);
   });
 
   test('OTP login flow establishes the BFF session', async ({ page }) => {
