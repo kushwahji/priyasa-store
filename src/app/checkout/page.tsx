@@ -16,16 +16,19 @@ export default function Checkout() {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selected, setSelected] = useState('');
   const [coupon, setCoupon] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay');
   const [quote, setQuote] = useState<Quote>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const loadQuote = useCallback(async (code: string) => {
-    const r = await api<any>('/storefront/checkout/validate', { method: 'POST', body: JSON.stringify({ coupon_code: code || '' }) });
-    setQuote(quoteOf(r));
-  }, []);
+  const loadQuote = useCallback(async (code = coupon) => {
+    try {
+      const r = await api<any>('/storefront/checkout/validate', { method: 'POST', body: JSON.stringify({ coupon_code: code || '' }) });
+      setQuote(quoteOf(r));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to validate your bag.'); }
+  }, [coupon]);
 
   useEffect(() => {
     (async () => {
@@ -37,9 +40,8 @@ export default function Checkout() {
         const preferred = list.find(a => a.is_default || a.default || a.default_address) || list[0];
         if (preferred) setSelected(String(preferred.id));
         await loadQuote('');
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unable to load checkout.');
-      } finally { setLoading(false); }
+      } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load checkout.'); }
+      finally { setLoading(false); }
     })();
   }, [loadQuote]);
 
@@ -55,12 +57,13 @@ export default function Checkout() {
     try {
       const r = await api<any>('/storefront/checkout/create-order', {
         method: 'POST',
-        body: JSON.stringify({ shipping_address_id: selected, coupon_code: coupon.trim().toUpperCase(), payment_method: 'razorpay' }),
+        body: JSON.stringify({ shipping_address_id: selected, coupon_code: coupon.trim().toUpperCase(), payment_method: paymentMethod }),
       });
       const v = unwrap(r);
       const orderId = v.order?.id ?? v.id ?? v.order_id;
       if (!orderId) throw new Error('Checkout did not return an order id.');
-      window.location.assign(`/checkout/payment?order=${encodeURIComponent(String(orderId))}`);
+      if (paymentMethod === 'cod') window.location.assign(`/orders/${encodeURIComponent(String(orderId))}`);
+      else window.location.assign(`/checkout/payment?order=${encodeURIComponent(String(orderId))}`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to create your order.'); setBusy(false); }
   }
 
@@ -84,9 +87,15 @@ export default function Checkout() {
           </button>) : <div className="emptyInline"><p>No saved address found.</p><Link href="/addresses">Add delivery address</Link></div>}
         </div>
         <div className="checkoutCard"><span className="eyebrow">STEP 2</span><h2>Offers & coupon</h2><div className="coupon"><input aria-label="Coupon code" value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())} placeholder="Enter coupon code"/><button type="button" onClick={applyCoupon}>Apply</button></div></div>
-        <div className="checkoutCard"><span className="eyebrow">STEP 3</span><h2>Payment</h2><div className="paymentChoice"><b>Razorpay</b><span>UPI, cards, net banking and wallets</span></div><p className="muted">Payment is verified by PriyasaCore. The browser does not mark an order as paid.</p></div>
+        <div className="checkoutCard"><span className="eyebrow">STEP 3</span><h2>Payment method</h2>
+          <div className="paymentOptions">
+            <button type="button" className={`paymentChoice ${paymentMethod === 'razorpay' ? 'selected' : ''}`} onClick={() => setPaymentMethod('razorpay')}><b>Razorpay</b><span>UPI, cards, net banking and wallets</span></button>
+            <button type="button" className={`paymentChoice ${paymentMethod === 'cod' ? 'selected' : ''}`} onClick={() => setPaymentMethod('cod')}><b>Cash on Delivery</b><span>Pay securely when your order is delivered</span></button>
+          </div>
+          <p className="muted">{paymentMethod === 'razorpay' ? 'Payment is verified by PriyasaCore. The browser does not mark an order as paid.' : 'COD orders are created server-side and do not require online payment.'}</p>
+        </div>
       </section>
-      <aside className="summary"><span className="eyebrow">ORDER SUMMARY</span><div><span>Subtotal</span><b>{money(subtotal)}</b></div>{discount > 0 && <div><span>Discount</span><b>-{money(discount)}</b></div>}<div><span>Shipping</span><b>{shipping ? money(shipping) : 'FREE'}</b></div>{tax > 0 && <div><span>Tax</span><b>{money(tax)}</b></div>}<hr/><div><strong>Total</strong><strong>{money(total)}</strong></div><button className="button" disabled={busy || !selected} onClick={placeOrder}>{busy ? 'Creating secure order…' : 'Continue to payment'}</button><small className="muted">Your final amount is calculated server-side from the current cart.</small></aside>
+      <aside className="summary"><span className="eyebrow">ORDER SUMMARY</span><div><span>Subtotal</span><b>{money(subtotal)}</b></div>{discount > 0 && <div><span>Discount</span><b>-{money(discount)}</b></div>}<div><span>Shipping</span><b>{shipping ? money(shipping) : 'FREE'}</b></div>{tax > 0 && <div><span>Tax</span><b>{money(tax)}</b></div>}<hr/><div><strong>Total</strong><strong>{money(total)}</strong></div><button className="button" disabled={busy || !selected} onClick={placeOrder}>{busy ? (paymentMethod === 'cod' ? 'Placing order…' : 'Creating secure order…') : (paymentMethod === 'cod' ? 'Place COD order' : 'Continue to payment')}</button><small className="muted">Final amount is calculated server-side from the current cart.</small></aside>
     </div>}
   </main>;
 }
