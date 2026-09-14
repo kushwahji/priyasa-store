@@ -39,11 +39,11 @@ test.describe('PRIYASA storefront smoke', () => {
     await page.getByLabel('Coupon code').fill(''); await page.getByRole('button', { name: 'Apply' }).click(); const response = await validation; expect(response.status()).toBeLessThan(500);
   });
 
-  test('authenticated PDP wishlist uses the canonical variant route', async ({ page }) => {
+  test('authenticated PDP wishlist uses the canonical toggle contract', async ({ page }) => {
     await requireSession(page); const slug = process.env.PRIYASA_E2E_PRODUCT_SLUG;
     test.skip(!slug, 'Set PRIYASA_E2E_PRODUCT_SLUG to exercise an authenticated PDP journey.');
     await page.goto(`/product/${encodeURIComponent(slug!)}`);
-    const wishlist = page.waitForResponse(r => /\/api\/priyasa\/storefront\/wishlist\/[^/]+\/toggle$/.test(r.url()) && r.request().method() === 'POST');
+    const wishlist = page.waitForResponse(r => r.url().endsWith('/api/priyasa/storefront/wishlist/toggle') && r.request().method() === 'POST');
     await page.getByRole('button', { name: /WISHLIST/ }).click(); const response = await wishlist; expect(response.status()).toBeLessThan(500);
   });
 
