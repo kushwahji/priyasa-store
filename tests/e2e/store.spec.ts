@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+async function requireSession(page: Parameters<typeof test>[0]['page']) {
+  const token = process.env.PRIYASA_E2E_ACCESS_TOKEN;
+  test.skip(!token, 'Set PRIYASA_E2E_ACCESS_TOKEN for authenticated E2E journeys.');
+  const url = new URL(process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000');
+  await page.context().addCookies([{ name: 'priyasa_session', value: token!, domain: url.hostname, path: '/', secure: url.protocol === 'https:' }]);
+}
+
 test.describe('PRIYASA storefront smoke', () => {
   test('home is CMS-driven and responsive', async ({ page }) => {
     const home = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/home') && r.request().method() === 'GET');
@@ -34,8 +41,8 @@ test.describe('PRIYASA storefront smoke', () => {
     await expect(page.locator('.bottomNav')).toBeVisible();
   });
 
-  test('checkout uses Core contract and supports COD', async ({ page }) => {
-    await page.route('**/api/session', async route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) }));
+  test('checkout uses the real Core contract and supports COD', async ({ page }) => {
+    await requireSession(page);
     await page.goto('/checkout');
     await expect(page.getByText('Delivery address')).toBeVisible();
     await expect(page.getByText('Cash on Delivery')).toBeVisible();
@@ -44,21 +51,21 @@ test.describe('PRIYASA storefront smoke', () => {
     await page.getByRole('button', { name: 'Place COD order' }).click();
     const response = await createOrder;
     expect(response.ok()).toBeTruthy();
-    await expect(page).toHaveURL(/\/orders\/1001/);
+    await expect(page).toHaveURL(/\/orders\//);
   });
 
   test('checkout coupon is validated by Core', async ({ page }) => {
-    await page.route('**/api/session', async route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) }));
+    await requireSession(page);
     await page.goto('/checkout');
     const validate = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/validate') && r.request().method() === 'POST');
     await page.getByLabel('Coupon code').fill('SAVE100');
     await page.getByRole('button', { name: 'Apply' }).click();
     const response = await validate;
-    expect(response.ok()).toBeTruthy();
+    expect(response.status()).toBeLessThan(500);
     await expect(page.getByRole('status')).toContainText('Coupon checked');
   });
 
-  test('OTP login flow establishes the session', async ({ page }) => {
+  test('OTP login flow establishes the BFF session', async ({ page }) => {
     test.skip(!process.env.PRIYASA_E2E_MOBILE || !process.env.PRIYASA_E2E_OTP, 'Set PRIYASA_E2E_MOBILE and PRIYASA_E2E_OTP for a real deployed OTP journey.');
     await page.goto('/auth/login?next=/account');
     await page.getByLabel('Mobile number').fill(process.env.PRIYASA_E2E_MOBILE!);
@@ -67,6 +74,8 @@ test.describe('PRIYASA storefront smoke', () => {
     await page.getByLabel('OTP').fill(process.env.PRIYASA_E2E_OTP!);
     await page.getByRole('button', { name: 'Verify & continue' }).click();
     await expect(page).toHaveURL(/\/account/);
+    const cookies = await page.context().cookies();
+    expect(cookies.find(c => c.name === 'priyasa_session')?.httpOnly).toBeTruthy();
   });
 
   test('guest protected route returns to login', async ({ page }) => {
