@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import '@/app/home-dynamic.css';
 import ProductCard from '@/components/ProductCard';
 import { api } from '@/lib/api';
 
@@ -115,7 +114,7 @@ export default function HomeExperience() {
         const items = Array.isArray(content.items) ? content.items : [];
         const item = items[slide] || items[0];
         if (!item) return null;
-        const style = {'--hero-desktop': `url("${item.image_url || ''}")`, '--hero-mobile': `url("${item.mobile_image_url || item.image_url || ''}")`} as CSSProperties;
+        const style = {'--hero-desktop': `url(\"${item.image_url || ''}\")`, '--hero-mobile': `url(\"${item.mobile_image_url || item.image_url || ''}\")`} as CSSProperties;
         return <section className="dynamicHero" key={key} style={style}><div className="dynamicHeroShade" /><div className="dynamicHeroCopy"><span className="eyebrow">{item.eyebrow || 'PRIYASA EDIT'}</span><h1>{item.title}</h1><p>{item.subtitle}</p>{item.cta?.href && <Link className="button" href={item.cta.href}>{item.cta.label || 'Shop now'}</Link>}</div>{items.length > 1 && <div className="heroDots" aria-label="Hero slides">{items.map((_: AnyRecord, index: number) => <button type="button" key={index} aria-label={`Slide ${index + 1}`} className={index === slide ? 'active' : ''} onClick={() => setSlide(index)} />)}</div>}</section>;
       }
 
@@ -128,7 +127,7 @@ export default function HomeExperience() {
       if (section.type === 'editorial_grid') {
         const items = Array.isArray(content.items) ? content.items : [];
         if (!items.length) return null;
-        return <section className="section dynamicEditorial" key={key}><div className="sectionHead"><div><span className="eyebrow">PRIYASA EDIT</span><h2>{section.title || 'Shop the edit'}</h2>{section.subtitle && <p className="muted">{section.subtitle}</p>}</div></div><div className={`dynamicEditorialGrid ${layoutClass(section, 'editorial')}`}>{items.map((item: AnyRecord, index: number) => <Link key={item.id || index} href={item.href || '/shop'} className="dynamicEditorialCard" style={{backgroundImage:`linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72)),url("${item.image_url || ''}")`}}><span>0{index + 1}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div></Link>)}</div></section>;
+        return <section className="section dynamicEditorial" key={key}><div className="sectionHead"><div><span className="eyebrow">PRIYASA EDIT</span><h2>{section.title || 'Shop the edit'}</h2>{section.subtitle && <p className="muted">{section.subtitle}</p>}</div></div><div className={`dynamicEditorialGrid ${layoutClass(section, 'editorial')}`}>{items.map((item: AnyRecord, index: number) => <Link key={item.id || index} href={item.href || '/shop'} className="dynamicEditorialCard" style={{backgroundImage:`linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72)),url(\"${item.image_url || ''}\")`}}><span>0{index + 1}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div></Link>)}</div></section>;
       }
 
       if (productSectionTypes.has(section.type ?? '')) {
@@ -139,7 +138,7 @@ export default function HomeExperience() {
       }
 
       if (section.type === 'offer_banner' || section.type === 'image_banner') {
-        const style = {'--banner-desktop': `url("${content.image_url || ''}")`, '--banner-mobile': `url("${content.mobile_image_url || content.image_url || ''}")`} as CSSProperties;
+        const style = {'--banner-desktop': `url(\"${content.image_url || ''}\")`, '--banner-mobile': `url(\"${content.mobile_image_url || content.image_url || ''}\")`} as CSSProperties;
         return <section className="section dynamicBanner" key={key} style={style}><div><span className="eyebrow">{content.eyebrow || 'PRIYASA'}</span><h2>{content.title}</h2><p>{content.subtitle}</p>{content.cta?.href && <Link className="button" href={content.cta.href}>{content.cta.label || 'Explore'}</Link>}</div></section>;
       }
 
