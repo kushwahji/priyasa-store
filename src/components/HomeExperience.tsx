@@ -10,6 +10,8 @@ type HomeData = { version?: number; currency?: string; locale?: string; header?:
 
 type Product = Record<string, any>;
 
+const productSectionTypes = new Set(['product_carousel', 'product_grid', 'flash_sale', 'personalized_products']);
+
 function productsOf(result: any): Product[] {
   const value = result?.data?.data ?? result?.data?.products ?? result?.data ?? result?.products ?? [];
   return Array.isArray(value) ? value : [];
@@ -39,7 +41,7 @@ export default function HomeExperience() {
       const result = await api<any>('/storefront/home');
       const data = result?.data || result || {};
       setHome(data);
-      const dynamic = (data.sections || []).filter((s: Section) => ['product_carousel', 'product_grid', 'flash_sale', 'personalized_products'].includes(s.type));
+      const dynamic = (data.sections || []).filter((s: Section) => productSectionTypes.has(s.type ?? ''));
       const entries = await Promise.all(dynamic.map(async (section: Section) => {
         const query = section.content?.query || {};
         const params = new URLSearchParams();
@@ -79,7 +81,7 @@ export default function HomeExperience() {
       }
       if (section.type === 'service_strip') return <section className="dynamicServices" key={key}>{(c.items || []).map((item: any, i: number) => <div key={item.title || i}><span aria-hidden="true">{item.icon === 'truck' ? '⌁' : item.icon === 'shield' ? '◇' : item.icon === 'location' ? '⌖' : '↩'}</span><strong>{item.title}</strong><small>{item.subtitle}</small></div>)}</section>;
       if (section.type === 'editorial_grid') return <section className="section dynamicEditorial" key={key}><div className="sectionHead"><div><span className="eyebrow">PRIYASA EDIT</span><h2>{section.title || 'Shop the edit'}</h2></div></div><div className="dynamicEditorialGrid">{(c.items || []).map((item: any, i: number) => <Link key={item.id || i} href={item.href || '/shop'} className="dynamicEditorialCard" style={{ backgroundImage: `linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72)),url("${item.image_url || ''}")` }}><span>0{i + 1}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div></Link>)}</div></section>;
-      if (['product_carousel', 'product_grid', 'flash_sale', 'personalized_products'].includes(section.type)) {
+      if (productSectionTypes.has(section.type ?? '')) {
         const items = (products[key] || []).map(cardProduct); if (!items.length) return null;
         return <section className={`section dynamicProducts ${section.type === 'product_grid' ? 'isGrid' : ''}`} key={key}><div className="sectionHead"><div><span className="eyebrow">{section.type === 'flash_sale' ? 'LIMITED TIME' : 'PRIYASA PICKS'}</span><h2>{section.title || 'Discover more'}</h2>{section.subtitle && <p className="muted">{section.subtitle}</p>}</div>{c.cta?.href && <Link className="textLink" href={c.cta.href}>{c.cta.label || 'View all'} →</Link>}</div><div className="homeProductRail">{items.map(p => <ProductCard key={String(p.id || p.slug)} product={p as any} />)}</div></section>;
       }
