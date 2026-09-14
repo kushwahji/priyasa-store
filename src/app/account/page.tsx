@@ -8,7 +8,6 @@ type SessionState = 'loading' | 'authenticated' | 'guest' | 'unavailable';
 
 export default function Account() {
   const [state, setState] = useState<SessionState>('loading');
-  const [user, setUser] = useState<any>(null);
 
   const checkSession = async () => {
     setState('loading');
@@ -22,12 +21,6 @@ export default function Account() {
 
       if (response.ok && data.authenticated === true) {
         setState('authenticated');
-        try {
-          const profile = await api<any>('/auth/me');
-          setUser(profile?.data || profile?.user || profile || null);
-        } catch {
-          setUser(null);
-        }
         return;
       }
 
@@ -100,7 +93,7 @@ export default function Account() {
   return (
     <main className="accountPage">
       <span className="eyebrow">MY PRIYASA</span>
-      <h1>Hello{user?.name ? `, ${user.name}` : ''}</h1>
+      <h1>My account</h1>
       <div className="accountGrid">
         <Link href="/orders"><strong>My orders</strong><small>Track, cancel and return orders</small></Link>
         <Link href="/wishlist"><strong>Wishlist</strong><small>Saved styles and favourites</small></Link>
