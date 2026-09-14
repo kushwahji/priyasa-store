@@ -31,11 +31,12 @@ function productsOf(result: AnyRecord): Product[] {
   return Array.isArray(value) ? value : [];
 }
 
-function cardProduct(product: Product): Product {
+function cardProduct(product: Product): Product & { name: string } {
   const pricing = product.pricing || {};
   const media = Array.isArray(product.media) ? product.media : [];
   return {
     ...product,
+    name: String(product.name ?? product.title ?? product.product_name ?? 'PRIYASA Product'),
     price: product.price ?? pricing.selling_price,
     mrp: product.mrp ?? pricing.mrp,
     image: product.image ?? media[0]?.url ?? media[0]?.image_url,
