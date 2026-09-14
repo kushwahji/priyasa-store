@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './responsive-overrides.css';
 import StoreShell from '@/components/StoreShell';
 
 export const metadata: Metadata = {
