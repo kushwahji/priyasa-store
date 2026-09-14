@@ -19,7 +19,7 @@ test.describe('PRIYASA storefront smoke', () => {
 
   test('header search works', async ({ page }) => {
     await page.goto('/');
-    const search = page.locator('header input[aria-label="Search products"]');
+    const search = page.locator('header input[aria-label="Search products"]').first();
     await search.fill('kurti');
     await search.press('Enter');
     await expect(page).toHaveURL(/\/search\?q=kurti/);
@@ -32,6 +32,30 @@ test.describe('PRIYASA storefront smoke', () => {
     await page.getByRole('link', { name: 'NEW IN' }).first().click();
     await expect(page).toHaveURL(/\/shop\?sort=newest/);
     await expect(page.locator('.bottomNav')).toBeVisible();
+  });
+
+  test('checkout uses Core contract and supports COD', async ({ page }) => {
+    await page.route('**/api/session', async route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) }));
+    await page.goto('/checkout');
+    await expect(page.getByText('Delivery address')).toBeVisible();
+    await expect(page.getByText('Cash on Delivery')).toBeVisible();
+    await page.getByRole('button', { name: /Cash on Delivery/ }).click();
+    const createOrder = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/create-order') && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Place COD order' }).click();
+    const response = await createOrder;
+    expect(response.ok()).toBeTruthy();
+    await expect(page).toHaveURL(/\/orders\/1001/);
+  });
+
+  test('checkout coupon is validated by Core', async ({ page }) => {
+    await page.route('**/api/session', async route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true }) }));
+    await page.goto('/checkout');
+    const validate = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/validate') && r.request().method() === 'POST');
+    await page.getByLabel('Coupon code').fill('SAVE100');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    const response = await validate;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByRole('status')).toContainText('Coupon checked');
   });
 
   test('OTP login flow establishes the session', async ({ page }) => {
