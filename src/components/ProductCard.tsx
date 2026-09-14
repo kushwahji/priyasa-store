@@ -1,4 +1,13 @@
-'use client';
-import Link from 'next/link'; import { useState } from 'react'; import { api } from '@/lib/api';
-type Product={id?:string|number;slug?:string;name:string;category?:string;price?:number;mrp?:number;image?:string;variants?:Array<{id?:string|number;stock?:{available?:number};inventory?:{available?:number}}>};
-export default function ProductCard({product}:{product:Product}){const[saved,setSaved]=useState(false);const[busy,setBusy]=useState(false);const[message,setMessage]=useState('');const price=Number(product.price||0);const mrp=Number(product.mrp||0);const discount=mrp>price?Math.round((1-price/mrp)*100):0;async function wishlist(e:React.MouseEvent){e.preventDefault();e.stopPropagation();if(!product.id||busy)return;const variant=product.variants?.find(v=>Number(v.inventory?.available??v.stock?.available??0)>0)||product.variants?.[0];setBusy(true);setMessage('');try{await api('/storefront/wishlist/items',{method:'POST',body:JSON.stringify({product_id:Number(product.id),variant_id:variant?.id?Number(variant.id):undefined})});setSaved(true)}catch(e){setMessage(e instanceof Error?e.message:'Unable to update wishlist')}finally{setBusy(false)}}return <article className="productCard"><Link href={`/product/${product.slug||product.id||''}`}><div className="productImage">{product.image?<img src={product.image} alt={product.name} loading="lazy"/>:null}{discount>0&&<span className="productBadge">{discount}% OFF</span>}</div><div className="productInfo"><strong>{product.name}</strong><small>{product.category||'PRIYASA'}</small><div className="price">₹{price.toLocaleString('en-IN')} {mrp>price&&<del>₹{mrp.toLocaleString('en-IN')}</del>}</div></div></Link><button className={`heart ${saved?'saved':''}`} aria-label={`${saved?'Saved':'Wishlist'} ${product.name}`} aria-pressed={saved} disabled={busy} onClick={wishlist}>{saved?'♥':'♡'}</button>{message&&<small className="actionMessage" role="status">{message}</small>}</article>}
+import Link from 'next/link';
+
+type Product = { id?: string|number; slug?: string; name: string; category?: string; price?: number; mrp?: number; image?: string };
+
+export default function ProductCard({ product }: { product: Product }) {
+  const price = Number(product.price || 0);
+  const mrp = Number(product.mrp || 0);
+  const discount = mrp > price ? Math.round((1 - price / mrp) * 100) : 0;
+  return <Link className="productCard" href={`/product/${product.slug || product.id || ''}`}>
+    <div className="productImage">{product.image ? <img src={product.image} alt={product.name} loading="lazy" /> : null}{discount > 0 && <span className="productBadge">{discount}% OFF</span>}<button className="heart" aria-label={`Wishlist ${product.name}`} onClick={e => e.preventDefault()}>♡</button></div>
+    <div className="productInfo"><strong>{product.name}</strong><small>{product.category || 'PRIYASA'}</small><div className="price">₹{price.toLocaleString('en-IN')} {mrp > price && <del>₹{mrp.toLocaleString('en-IN')}</del>}</div></div>
+  </Link>;
+}

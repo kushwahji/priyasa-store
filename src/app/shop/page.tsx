@@ -1,33 +1,23 @@
-import Link from 'next/link';
 import ProductCard from '@/components/ProductCard';
 import { api } from '@/lib/api';
 
-type Product = { id?: string | number; slug?: string; name: string; brand?: any; category?: any; pricing?: { selling_price?: number; mrp?: number }; price?: number; mrp?: number; media?: Array<{ url?: string }>; image?: string };
-type Result = { data?: { data?: Product[]; meta?: { total?: number; current_page?: number; last_page?: number; per_page?: number } } };
-type CategoriesResult = { data?: Array<{ id?: string | number; slug: string; name: string }> };
+type Product = { id?: string|number; slug?: string; name: string; category?: string; price?: number; mrp?: number; image?: string };
+type Result = { data?: { products?: Product[]; categories?: {id?:string;slug:string;name:string}[] } };
 
-function normalizeProduct(product: Product) { return { ...product, category: typeof product.category === 'object' ? product.category?.name : product.category, price: Number(product.price ?? product.pricing?.selling_price ?? 0), mrp: Number(product.mrp ?? product.pricing?.mrp ?? 0), image: product.image || product.media?.find(item => item.url)?.url }; }
-function cleanNumber(value?: string) { const n = Number(String(value || '').replace(/\D/g, '')); return Number.isFinite(n) && n > 0 ? String(Math.min(n, 100000000)) : ''; }
-async function getProducts(searchParams: Record<string, string | undefined>) { const qs = new URLSearchParams(); for (const [key, value] of Object.entries(searchParams)) if (value) qs.set(key, value); qs.set('per_page', '24'); try { const result = await api<Result>(`/storefront/products?${qs.toString()}`); return { products: (result.data?.data || []).map(normalizeProduct), meta: result.data?.meta || {} }; } catch { return { products: [], meta: {} }; } }
-async function getCategories() { try { const result = await api<CategoriesResult>('/storefront/categories'); return result.data || []; } catch { return []; } }
+async function getProducts(searchParams: Record<string,string|undefined>) {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) if (value) qs.set(key, value);
+  qs.set('limit', '48');
+  try { return await api<Result>(`/storefront/products?${qs.toString()}`); } catch { return { data: { products: [], categories: [] } }; }
+}
 
-export default async function Shop({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const raw = await searchParams;
-  const params: Record<string, string | undefined> = { ...raw };
-  if (params.min_price) params.min_price = cleanNumber(params.min_price);
-  if (params.max_price) params.max_price = cleanNumber(params.max_price);
-  if (params.page && (!/^\d+$/.test(params.page) || Number(params.page) < 1)) params.page = '1';
-  const [{ products, meta }, categories] = await Promise.all([getProducts(params), getCategories()]);
-  const withoutSort = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) if (value && !['sort', 'page'].includes(key)) withoutSort.set(key, value);
-  const hrefFor = (changes: Record<string, string | null>) => { const q = new URLSearchParams(withoutSort); if (params.sort && !('sort' in changes)) q.set('sort', params.sort); for (const [key, value] of Object.entries(changes)) { if (value === null || value === '') q.delete(key); else q.set(key, value); } const value = q.toString(); return value ? `/shop?${value}` : '/shop'; };
-  const currentPage = Math.max(1, Number(meta.current_page || params.page || 1)); const lastPage = Math.max(1, Number(meta.last_page || 1));
-  const hasFilters = Boolean(params.category || params.min_price || params.max_price || params.in_stock || (params.sort && params.sort !== 'relevance'));
-  return <main className="catalogPage">
-    <div className="sectionHead"><div><span className="eyebrow">PRIYASA / SHOP</span><h1>All styles</h1><p className="muted">Discover the latest PRIYASA collections.</p></div><span className="muted">{Number(meta.total || products.length).toLocaleString('en-IN')} styles</span></div>
-    <div className="shopToolbar"><div className="filterChips"><Link className={`filterChip ${!params.category ? 'active' : ''}`} href={hrefFor({ category: null, page: null })}>All</Link>{categories.slice(0, 10).map(c => <Link key={c.slug} className={`filterChip ${params.category === c.slug ? 'active' : ''}`} href={hrefFor({ category: c.slug, page: null })}>{c.name}</Link>)}</div><div className="filterChips" aria-label="Sort products"><Link className={`filterChip ${!params.sort || params.sort === 'relevance' ? 'active' : ''}`} href={hrefFor({ sort: null, page: null })}>Recommended</Link><Link className={`filterChip ${params.sort === 'newest' ? 'active' : ''}`} href={hrefFor({ sort: 'newest', page: null })}>Newest</Link><Link className={`filterChip ${params.sort === 'price_asc' ? 'active' : ''}`} href={hrefFor({ sort: 'price_asc', page: null })}>Price ↑</Link><Link className={`filterChip ${params.sort === 'price_desc' ? 'active' : ''}`} href={hrefFor({ sort: 'price_desc', page: null })}>Price ↓</Link><Link className={`filterChip ${params.sort === 'discount' ? 'active' : ''}`} href={hrefFor({ sort: 'discount', page: null })}>Discount</Link></div></div>
-    <form className="catalogFilters" method="get"><input type="hidden" name="category" value={params.category || ''}/><input type="hidden" name="sort" value={params.sort || ''}/><div><label htmlFor="shop-min">Minimum price</label><input id="shop-min" name="min_price" inputMode="numeric" pattern="[0-9]*" placeholder="Min ₹" defaultValue={params.min_price || ''}/></div><div><label htmlFor="shop-max">Maximum price</label><input id="shop-max" name="max_price" inputMode="numeric" pattern="[0-9]*" placeholder="Max ₹" defaultValue={params.max_price || ''}/></div><label className="stockFilter"><input type="checkbox" name="in_stock" value="1" defaultChecked={params.in_stock === '1' || params.in_stock === 'true'}/> In stock only</label><button className="button" type="submit">Apply filters</button>{hasFilters && <Link className="filterChip" href="/shop">Clear all</Link>}</form>
-    <div className="mobileCatalogControls"><details><summary>Filters{hasFilters ? ' • Active' : ''}</summary><div className="mobileFilterPanel"><form method="get"><input type="hidden" name="category" value={params.category || ''}/><input type="hidden" name="sort" value={params.sort || ''}/><label>Min price<input name="min_price" inputMode="numeric" pattern="[0-9]*" defaultValue={params.min_price || ''}/></label><label>Max price<input name="max_price" inputMode="numeric" pattern="[0-9]*" defaultValue={params.max_price || ''}/></label><label><input type="checkbox" name="in_stock" value="1" defaultChecked={params.in_stock === '1' || params.in_stock === 'true'}/> In stock only</label><button className="button" type="submit">Apply filters</button></form>{hasFilters && <Link className="filterChip" href="/shop">Clear all</Link>}</div></details><details><summary>Sort</summary><div className="mobileFilterPanel"><Link href={hrefFor({ sort: null, page: null })}>Recommended</Link><Link href={hrefFor({ sort: 'newest', page: null })}>Newest</Link><Link href={hrefFor({ sort: 'price_asc', page: null })}>Price: low to high</Link><Link href={hrefFor({ sort: 'price_desc', page: null })}>Price: high to low</Link><Link href={hrefFor({ sort: 'discount', page: null })}>Discount</Link></div></details></div>
-    {products.length ? <><div className="productGrid">{products.map((p, i) => <ProductCard key={String(p.id || p.slug || i)} product={p} />)}</div>{lastPage > 1 && <nav className="pagination" aria-label="Catalog pages"><Link className={`filterChip ${currentPage <= 1 ? 'disabled' : ''}`} aria-disabled={currentPage <= 1} href={currentPage <= 1 ? '/shop' : hrefFor({ page: String(currentPage - 1) })}>← Previous</Link><span>Page {currentPage} of {lastPage}</span><Link className={`filterChip ${currentPage >= lastPage ? 'disabled' : ''}`} aria-disabled={currentPage >= lastPage} href={currentPage >= lastPage ? '#' : hrefFor({ page: String(currentPage + 1) })}>Next →</Link></nav>}</> : <div className="emptyState"><h2>No styles found</h2><p>{hasFilters ? 'Try clearing a filter or widening your price range.' : 'Try another category or search term.'}</p>{hasFilters ? <Link className="button" href="/shop">Clear filters</Link> : <Link className="button" href="/search">Search the store</Link>}</div>}
+export default async function Shop({ searchParams }: { searchParams: Promise<Record<string,string|undefined>> }) {
+  const params = await searchParams;
+  const result = await getProducts(params);
+  const products = result.data?.products || [];
+  const categories = result.data?.categories || [];
+  return <main className="catalogPage"><div className="sectionHead"><div><span className="eyebrow">PRIYASA / SHOP</span><h1>All styles</h1><p className="muted">Discover the latest PRIYASA collections.</p></div><span className="muted">{products.length} styles</span></div>
+    <div className="shopToolbar"><div className="filterChips">{categories.slice(0,6).map(c => <a key={c.slug} className="filterChip" href={`/shop?category=${encodeURIComponent(c.slug)}`}>{c.name}</a>)}</div><select defaultValue={params.sort || 'relevance'} aria-label="Sort products" onChange={() => {}}><option value="relevance">Recommended</option><option value="newest">Newest</option><option value="price_asc">Price: Low to High</option><option value="price_desc">Price: High to Low</option><option value="discount">Discount</option></select></div>
+    {products.length ? <div className="productGrid">{products.map((p, i) => <ProductCard key={String(p.id || p.slug || i)} product={p} />)}</div> : <div className="emptyState"><h2>Collection loading</h2><p>Products will appear here when the PriyasaCore catalog API is connected.</p><a className="button" href="/search">Search the store</a></div>}
   </main>;
 }

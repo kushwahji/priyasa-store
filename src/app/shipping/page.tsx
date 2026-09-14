@@ -1,3 +1,0 @@
-import Link from 'next/link';
-
-export default function ShippingPage() { return <main className="catalogPage"><div className="sectionHead"><div><span className="eyebrow">PRIYASA / POLICY</span><h1>Shipping</h1><p className="muted">Delivery options and serviceability are calculated by PriyasaCore at checkout.</p></div></div><div className="checkoutCard"><h2>Delivery</h2><p>Enter your delivery address and pincode during checkout. PriyasaCore checks serviceability, shipping charges and available delivery options before an order is placed.</p><p>For an existing order, use <Link className="textLink" href="/orders">My Orders</Link> to track its current status.</p></div></main>; }
