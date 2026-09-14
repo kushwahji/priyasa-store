@@ -1,0 +1,23 @@
+'use client';
+
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+
+function unwrap(r: any) { return r?.data?.order ?? r?.data ?? r?.order ?? r ?? {}; }
+function money(v: any) { return `₹${Number(v || 0).toLocaleString('en-IN')}`; }
+function label(v: any) { return String(v || 'processing').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+
+export default function OrderDetail() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id || '';
+  const [order, setOrder] = useState<any>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const load = useCallback(async () => { if (!id) return; setLoading(true); setError(''); try { setOrder(unwrap(await api<any>(`/storefront/orders/${encodeURIComponent(id)}`))); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load this order.'); } finally { setLoading(false); } }, [id]);
+  useEffect(() => { void load(); }, [load]);
+  if (loading) return <main className="accountPage"><div className="emptyState"><h2>Loading order…</h2></div></main>;
+  if (error) return <main className="accountPage"><div className="emptyState"><span className="eyebrow">PRIYASA / ORDER</span><h1>Order unavailable</h1><p>{error}</p><button className="button" type="button" onClick={() => void load()}>Retry</button></div></main>;
+  if (!order) return null;
+  const items = order.items || order.line_items || []; const total = order.grand_total ?? order.total ?? order.amount; const address = order.shipping_address || order.shippingAddress || order.address; const status = String(order.status || 'processing');
+  return <main className="accountPage"><div className="sectionHead"><div><span className="eyebrow">PRIYASA / ORDER</span><h1>#{order.order_number || order.id || id}</h1><p className="muted">{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Order details'}</p></div><Link className="textLink" href="/orders">← All orders</Link></div><div className="orderDetailGrid"><section><div className="checkoutCard"><div className="orderStatus"><span>Status</span><strong>{label(status)}</strong></div>{items.length ? <div className="orderLines">{items.map((item:any,i:number) => <article key={String(item.id || i)} className="orderLine"><div className="cartThumb">{(item.image || item.product?.image || item.product?.media?.[0]?.url) && <img src={item.image || item.product?.image || item.product?.media?.[0]?.url} alt="" />}</div><div><strong>{item.product_name || item.name || item.product?.name || 'PRIYASA product'}</strong><small>{item.variant_label || item.size || item.variant?.label || 'Standard'} · Qty {item.quantity || 1}</small><b>{money(item.line_total ?? item.total ?? item.unit_price ?? item.price)}</b></div></article>)}</div> : <p className="muted">Order items are not available in this response.</p>}</div><div className="checkoutCard"><span className="eyebrow">ORDER TIMELINE</span><div className="timeline"><div><b>Order placed</b><span>{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Confirmed by PRIYASA'}</span></div><div className={['delivered','cancelled','returned'].includes(status) ? 'done' : ''}><b>{label(status)}</b><span>Current order status</span></div></div></div>{address && <div className="checkoutCard"><span className="eyebrow">DELIVERY ADDRESS</span><p><strong>{address.name || address.full_name || 'Delivery address'}</strong><br />{[address.address_line1 || address.line1, address.address_line2 || address.line2, address.city, address.state, address.postal_code || address.pincode].filter(Boolean).join(', ')}</p></div>}</section><aside className="summary"><span className="eyebrow">PRICE DETAILS</span><div><span>Subtotal</span><b>{money(order.subtotal)}</b></div>{Number(order.discount_total || order.discount) > 0 && <div><span>Discount</span><b>-{money(order.discount_total || order.discount)}</b></div>}<div><span>Shipping</span><b>{Number(order.shipping_total || order.shipping) ? money(order.shipping_total || order.shipping) : 'FREE'}</b></div>{Number(order.tax_total || order.tax) > 0 && <div><span>Tax</span><b>{money(order.tax_total || order.tax)}</b></div>}<hr/><div><strong>Total</strong><strong>{money(total)}</strong></div>{order.id && <><Link className="button" href={`/orders/${encodeURIComponent(String(order.id))}/tracking`}>Track order</Link><Link className="textLink" href={`/orders/${encodeURIComponent(String(order.id))}/invoice`}>View invoice →</Link></>}</aside></div></main>;
+}
