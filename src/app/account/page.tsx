@@ -21,8 +21,8 @@ export default function Account() {
   useEffect(() => { void checkSession(); }, []);
 
   const signOut = async () => {
-    try { await api('/storefront/session/logout', { method: 'POST' }); }
-    catch { /* BFF clears the session when Core returns 401. */ }
+    try { await api('/auth/logout', { method: 'POST' }); }
+    catch { /* The BFF clears the HttpOnly session cookie on logout/401. */ }
     finally { clearAccessToken(); window.location.assign('/'); }
   };
 
