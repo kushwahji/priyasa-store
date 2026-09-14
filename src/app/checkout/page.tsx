@@ -23,7 +23,7 @@ export default function Checkout() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const loadQuote = useCallback(async (code = coupon) => {
+  const loadQuote = useCallback(async (code: string) => {
     try {
       const r = await api<any>('/storefront/checkout/validate', { method: 'POST', body: JSON.stringify({ coupon_code: code || '' }) });
       const nextQuote = quoteOf(r);
@@ -34,7 +34,7 @@ export default function Checkout() {
       setError(message);
       throw e;
     }
-  }, [coupon]);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -53,7 +53,8 @@ export default function Checkout() {
 
   async function applyCoupon() {
     setError(''); setMessage('');
-    try { await loadQuote(coupon.trim().toUpperCase()); setMessage(coupon ? 'Coupon checked against the current cart.' : 'Coupon removed.'); }
+    const code = coupon.trim().toUpperCase();
+    try { await loadQuote(code); setMessage(code ? 'Coupon checked against the current cart.' : 'Coupon removed.'); }
     catch { /* loadQuote already exposes the API error */ }
   }
 
