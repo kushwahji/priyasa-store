@@ -4,6 +4,17 @@ const SESSION_MARKER='priyasa_session_active';
 
 function base(){return typeof window==='undefined'?SERVER_BASE:BROWSER_BASE}
 
+function idempotencyKey(){
+  try{
+    if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return crypto.randomUUID();
+    if(typeof crypto!=='undefined'&&typeof crypto.getRandomValues==='function'){
+      const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+      return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch{}
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
 // Browser code never reads or stores the bearer token. The BFF owns the HttpOnly session cookie.
 export function getAccessToken(){return typeof window!=='undefined'&&localStorage.getItem(SESSION_MARKER)==='1'?'session':null}
 export function setAccessToken(token:string){if(typeof window!=='undefined'&&token)localStorage.setItem(SESSION_MARKER,'1')}
@@ -22,7 +33,7 @@ export async function api<T>(path:string,init:RequestInit={}){
   headers.set('Accept','application/json');
   if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
   const method=(init.method||'GET').toUpperCase();
-  if(['POST','PUT','PATCH','DELETE'].includes(method)&&!headers.has('Idempotency-Key'))headers.set('Idempotency-Key',crypto.randomUUID());
+  if(['POST','PUT','PATCH','DELETE'].includes(method)&&!headers.has('Idempotency-Key'))headers.set('Idempotency-Key',idempotencyKey());
 
   let res:Response;
   try{
