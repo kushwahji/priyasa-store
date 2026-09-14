@@ -14,6 +14,7 @@ export default function ProductCard({ product }: { product: Product }) {
   const media = Array.isArray(product.media) ? product.media : [];
   const image = media[0]?.url ?? media[0] ?? product.image;
   const category = typeof product.category === 'object' ? product.category?.name : product.category;
+  const brand = typeof product.brand === 'object' ? product.brand?.name : product.brand;
   const key = product.id ?? product.slug ?? '';
   const variantId = product.variant_id ?? product.variants?.[0]?.id ?? '';
   const rating = Number(product.rating?.average ?? product.rating ?? 0);
@@ -23,23 +24,19 @@ export default function ProductCard({ product }: { product: Product }) {
   const [wishError, setWishError] = useState('');
   const storeUrl = process.env.NEXT_PUBLIC_STORE_URL || '';
   const shareUrl = storeUrl ? `${storeUrl}/product/${encodeURIComponent(String(key))}` : '';
-  const whatsapp = `https://wa.me/918104132334?text=${encodeURIComponent(`Hi PRIYASA, I want to order this product.\nProduct: ${product.name}\nPrice: ₹${price.toLocaleString('en-IN')}\n${mrp > price ? `MRP: ₹${mrp.toLocaleString('en-IN')}` : ''}${shareUrl ? `\nLink: ${shareUrl}` : ''}`)}`;
+  const whatsapp = `https://wa.me/918104132334?text=${encodeURIComponent(`Hi PRIYASA, I want to order this product.\nProduct: ${product.name}\nPrice: ₹${price.toLocaleString('en-IN')}${mrp > price ? `\nMRP: ₹${mrp.toLocaleString('en-IN')}` : ''}${shareUrl ? `\nLink: ${shareUrl}` : ''}`)}`;
 
   async function toggleWishlist(event: MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    event.stopPropagation();
+    event.preventDefault(); event.stopPropagation();
     if (!variantId || saving) return;
-    setSaving(true);
-    setWishError('');
+    setSaving(true); setWishError('');
     try {
-      await api('/storefront/wishlist/toggle', { method: 'POST', body: JSON.stringify({ variant_id: variantId }) });
+      await api(`/storefront/wishlist/${encodeURIComponent(String(variantId))}/toggle`, { method: 'POST' });
       setWishlisted((value) => !value);
     } catch (error) {
       if (error instanceof Error && /401|unauthorized|authentication/i.test(error.message)) window.location.assign('/auth/login');
       else setWishError(error instanceof Error ? error.message : 'Unable to update wishlist');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   return (
@@ -56,7 +53,7 @@ export default function ProductCard({ product }: { product: Product }) {
       </div>
       <Link href={`/product/${encodeURIComponent(String(key))}`} className="productCardLink">
         <div className="productInfo">
-          <strong>{product.brand || 'PRIYASA'}</strong>
+          <strong>{brand || 'PRIYASA'}</strong>
           <span className="productName">{product.name}</span>
           <small>{category || 'Fashion & lifestyle'}</small>
           <div className="price">₹{price.toLocaleString('en-IN')} {mrp > price && <del>₹{mrp.toLocaleString('en-IN')}</del>}{discount > 0 && <em>{discount}% OFF</em>}</div>
