@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || '').replace(/\/$/, '');
+const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || process.env.NEXT_PUBLIC_PRIYASA_API_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 const SESSION_COOKIE = 'priyasa_session';
 const UPSTREAM_TIMEOUT_MS = 20_000;
 
-// Keep the proxy server-side and dynamic so Hostinger/Next.js never bakes
-// PRIYASA_API_BASE_URL into a browser bundle or a static response.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -29,10 +27,7 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   const route = path.join('/');
   const session = request.cookies.get(SESSION_COOKIE)?.value;
 
-  if (route === '_session' && request.method === 'GET') {
-    return NextResponse.json({ authenticated: Boolean(session) }, { headers: { 'Cache-Control': 'no-store' } });
-  }
-  if (!UPSTREAM) return NextResponse.json({ message: 'PRIYASA_API_BASE_URL is not configured.' }, { status: 500 });
+  if (route === '_session' && request.method === 'GET') return NextResponse.json({ authenticated: Boolean(session) }, { headers: { 'Cache-Control': 'no-store' } });
 
   const target = `${UPSTREAM}/${path.map((part) => encodeURIComponent(part)).join('/')}${request.nextUrl.search}`;
   const headers = new Headers(request.headers);
@@ -48,9 +43,7 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   } catch (error) {
     const message = error instanceof Error && error.name === 'AbortError' ? 'PriyasaCore request timed out.' : 'PriyasaCore is temporarily unavailable.';
     return NextResponse.json({ message }, { status: 502 });
-  } finally {
-    clearTimeout(timeout);
-  }
+  } finally { clearTimeout(timeout); }
 
   const contentType = upstream.headers.get('content-type') || '';
   const responseBody = await upstream.arrayBuffer();
@@ -63,28 +56,13 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   }
 
   const response = new NextResponse(responseBody, { status: upstream.status, headers: responseHeaders });
-  const clear = () => response.cookies.set(SESSION_COOKIE, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  });
+  const clear = () => response.cookies.set(SESSION_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 });
 
   if (route === 'auth/verify-otp' && upstream.ok && contentType.includes('application/json')) {
     try {
-      const parsed = JSON.parse(new TextDecoder().decode(responseBody));
-      const token = extractToken(parsed);
-      if (token) response.cookies.set(SESSION_COOKIE, token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30,
-      });
-    } catch {
-      // Preserve the upstream response if its JSON cannot be decoded.
-    }
+      const token = extractToken(JSON.parse(new TextDecoder().decode(responseBody)));
+      if (token) response.cookies.set(SESSION_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 });
+    } catch { /* Keep upstream response intact. */ }
   }
   if (route === 'auth/logout' || upstream.status === 401) clear();
   return response;
