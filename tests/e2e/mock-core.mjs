@@ -11,6 +11,7 @@ function json(res, status, body) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
+  if (url.pathname === '/health') return json(res, 200, { ok: true });
   if (url.pathname === '/api/v1/storefront/categories') return json(res, 200, { data: [{ id: 1, slug: 'kurtis', name: 'Kurtis' }, { id: 2, slug: 'dresses', name: 'Dresses' }] });
   if (url.pathname === '/api/v1/storefront/products' && req.method === 'GET') return json(res, 200, { data: { data: [product], meta: { total: 1, current_page: 1, last_page: 1, per_page: 24 } } });
   if (url.pathname === '/api/v1/storefront/products/e2e-kurti' && req.method === 'GET') return json(res, 200, { data: product });
