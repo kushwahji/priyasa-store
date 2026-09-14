@@ -4,7 +4,7 @@ import './responsive-overrides.css';
 import './home-dynamic.css';
 import StoreShell from '@/components/StoreShell';
 
-const siteUrl = process.env.NEXT_PUBLIC_STORE_URL || 'http://localhost:3000';
+const siteUrl = (process.env.NEXT_PUBLIC_STORE_URL || 'http://localhost:3000').replace(/\/$/, '');
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   applicationName: 'PRIYASA',
   themeColor: '#282c3f',
   icons: { icon: '/icon.svg', shortcut: '/icon.svg', apple: '/icon.svg' },
+  alternates: { canonical: '/' },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
   openGraph: {
     type: 'website',
     siteName: 'PRIYASA',
