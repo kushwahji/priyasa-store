@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import { api } from '@/lib/api';
 
-type Address = { id?: string | number; label?: string; recipient_name?: string; phone?: string; line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; pincode?: string; country?: string; is_default?: boolean };
+type Address = { id?: string | number; label?: string; recipient_name?: string; name?: string; phone?: string; line1?: string; address_line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; pincode?: string; country?: string; is_default?: boolean };
 
 const empty: Address = { label: 'Home', recipient_name: '', phone: '', line1: '', line2: '', city: '', state: '', postal_code: '', country: 'IN', is_default: false };
 
