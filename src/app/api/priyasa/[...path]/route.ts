@@ -6,12 +6,17 @@ const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'p
 const MUTATIONS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const SESSION_ISSUE_PATHS = new Set(['/auth/verify-otp', '/storefront/session/rotate']);
 const SESSION_CLEAR_PATHS = new Set(['/auth/logout', '/storefront/session/logout', '/storefront/session/logout-all']);
+const PUBLIC_PREFIXES = ['/auth/', '/storefront/'];
 const UPSTREAM_TIMEOUT_MS = 15_000;
 
 function upstreamUrl(path: string[], request: NextRequest) {
   if (!UPSTREAM) throw new Error('PRIYASA_API_BASE_URL is not configured.');
   const clean = path.map(segment => encodeURIComponent(segment)).join('/');
   return `${UPSTREAM}/${clean}${request.nextUrl.search}`;
+}
+
+function allowedPath(pathname: string) {
+  return PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix));
 }
 
 function allowedOrigin(request: NextRequest) {
@@ -68,11 +73,15 @@ function publicAuthPayload(payload: unknown): unknown {
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   try {
+    const { path } = await context.params;
+    const pathname = `/${path.join('/')}`;
+    if (!allowedPath(pathname)) {
+      return NextResponse.json({ message: 'API surface is not available through the Store.' }, { status: 404 });
+    }
     if (MUTATIONS.has(request.method) && !allowedOrigin(request)) {
       return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
     }
 
-    const { path } = await context.params;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
     let response: Response;
@@ -92,7 +101,6 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const contentType = response.headers.get('content-type') || '';
     const isJson = contentType.includes('application/json');
     const rawPayload = isJson ? await response.json().catch(() => null) : await response.arrayBuffer();
-    const pathname = `/${path.join('/')}`;
     const body = isJson && rawPayload && typeof rawPayload === 'object' ? rawPayload as Record<string, any> : null;
     const token = tokenFrom(rawPayload);
     const payload = isJson && SESSION_ISSUE_PATHS.has(pathname) ? publicAuthPayload(rawPayload) : rawPayload;
