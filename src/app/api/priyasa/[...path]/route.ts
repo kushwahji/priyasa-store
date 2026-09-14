@@ -12,6 +12,13 @@ function extractToken(value:unknown):string|null{
   if(record.data&&typeof record.data==='object')return extractToken(record.data);
   return null;
 }
+function withoutToken(value:unknown):unknown{
+  if(!value||typeof value!=='object')return value;
+  const record={...(value as Record<string,unknown>)};
+  delete record.access_token;delete record.accessToken;delete record.token;
+  if(record.data&&typeof record.data==='object')record.data=withoutToken(record.data);
+  return record;
+}
 function isMutation(method:string){return ['POST','PUT','PATCH','DELETE'].includes(method)}
 function sameOrigin(request:NextRequest){const origin=request.headers.get('origin');return !origin||origin===request.nextUrl.origin}
 
@@ -19,6 +26,7 @@ export async function ALL(request:NextRequest,context:{params:Promise<{path:stri
   if(!UPSTREAM)return NextResponse.json({message:'PRIYASA_API_BASE_URL is not configured.'},{status:500});
   if(isMutation(request.method)&&!sameOrigin(request))return NextResponse.json({message:'Cross-origin request rejected.'},{status:403});
   const {path}=await context.params;
+  const route=path.join('/');
   const target=`${UPSTREAM}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`;
   const headers=new Headers();
   for(const [key,value] of request.headers){
@@ -37,8 +45,14 @@ export async function ALL(request:NextRequest,context:{params:Promise<{path:stri
     const contentType=upstream.headers.get('content-type');
     if(contentType)responseHeaders.set('content-type',contentType);
     for(const name of ['cache-control','etag','x-request-id','x-correlation-id']){const value=upstream.headers.get(name);if(value)responseHeaders.set(name,value)}
-    const response=new NextResponse(responseBody,{status:upstream.status,statusText:upstream.statusText,headers:responseHeaders});
-    const route=path.join('/');
+    let outgoingBody=responseBody;
+    if(route==='auth/verify-otp'&&upstream.ok&&contentType?.includes('application/json')){
+      try{
+        const parsed=JSON.parse(new TextDecoder().decode(responseBody));
+        outgoingBody=new TextEncoder().encode(JSON.stringify(withoutToken(parsed))).buffer;
+      }catch{}
+    }
+    const response=new NextResponse(outgoingBody,{status:upstream.status,statusText:upstream.statusText,headers:responseHeaders});
     const clear=()=>response.cookies.set(SESSION_COOKIE,'',{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:0});
     if(route==='auth/verify-otp'&&upstream.ok&&contentType?.includes('application/json')){
       try{const parsed=JSON.parse(new TextDecoder().decode(responseBody));const token=extractToken(parsed);if(token)response.cookies.set(SESSION_COOKIE,token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:60*60*24*30})}catch{}
