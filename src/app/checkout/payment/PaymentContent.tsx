@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import AuthGuard from '@/components/AuthGuard';
 import { api } from '@/lib/api';
 
 type PaymentSession = { razorpay_order_id?: string; provider_order_id?: string; order_id?: string; amount?: number | string; currency?: string; key_id?: string; razorpay_key_id?: string; payload?: { id?: string; key_id?: string; amount?: number; currency?: string } };
