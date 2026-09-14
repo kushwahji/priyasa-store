@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import '@/app/home-dynamic.css';
 import ProductCard from '@/components/ProductCard';
 import { api } from '@/lib/api';
 
@@ -138,7 +139,7 @@ export default function HomeExperience() {
       }
 
       if (section.type === 'offer_banner' || section.type === 'image_banner') {
-        const style = {'--banner-desktop':`url("${content.image_url || ''}")`,'--banner-mobile':`url("${content.mobile_image_url || content.image_url || ''")`} as CSSProperties;
+        const style = {'--banner-desktop': `url("${content.image_url || ''}")`, '--banner-mobile': `url("${content.mobile_image_url || content.image_url || ''}")`} as CSSProperties;
         return <section className="section dynamicBanner" key={key} style={style}><div><span className="eyebrow">{content.eyebrow || 'PRIYASA'}</span><h2>{content.title}</h2><p>{content.subtitle}</p>{content.cta?.href && <Link className="button" href={content.cta.href}>{content.cta.label || 'Explore'}</Link>}</div></section>;
       }
 
