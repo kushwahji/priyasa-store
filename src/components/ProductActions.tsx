@@ -15,7 +15,7 @@ export default function ProductActions({ variantId, sizes = [], colors = [], var
     return (variants.find(v => (v.size || v.label || '') === size && (!color || (v.color || v.colour || '') === color)) || variants.find(v => (v.size || v.label || '') === size) || variants[0])?.id || '';
   }, [variants, variantId, size, color]);
   const selected = variants.find(v => String(v.id) === String(selectedVariant));
-  const stock = selected ? Number(selected.stock ?? selected.inventory ?? 0) : undefined;
+  const stock = selected ? Number(selected.stock ?? selected.inventory ?? 0) : 0;
   const unavailable = selected ? stock <= 0 : !selectedVariant;
   async function addToBag(redirect = false) {
     if (!selectedVariant) return setMessage('This product variant is unavailable.');
@@ -34,9 +34,9 @@ export default function ProductActions({ variantId, sizes = [], colors = [], var
     finally { setBusy(null); }
   }
   return <>
-    {sizes.length ? <div className="variantBlock"><strong>Select size</strong><div className="variantRow">{sizes.map(s => <button type="button" key={s} className={size === s ? 'selected' : ''} onClick={() => setSize(s)}>{s}</button>)}</div></div> : null}
-    {colors.length ? <div className="variantBlock"><strong>Select colour</strong><div className="variantRow">{colors.map(c => <button type="button" key={c} className={color === c ? 'selected' : ''} onClick={() => setColor(c)}>{c}</button>)}</div></div> : null}
-    {selected && <div className="selectedVariant" aria-live="polite"><span>{selected.size || selected.label || ''}{selected.color || selected.colour ? ` · ${selected.color || selected.colour}` : ''}</span><b>{unavailable ? 'Out of stock' : stock !== undefined && stock <= 5 ? `Only ${stock} left` : 'In stock'}</b></div>}
+    {sizes.length ? <div className="variantBlock"><strong>Select size</strong><div className="variantRow">{sizes.map(s => <button type="button" key={s} className={size === s ? 'selected' : ''} aria-pressed={size === s} onClick={() => setSize(s)}>{s}</button>)}</div></div> : null}
+    {colors.length ? <div className="variantBlock"><strong>Select colour</strong><div className="variantRow">{colors.map(c => <button type="button" key={c} className={color === c ? 'selected' : ''} aria-pressed={color === c} onClick={() => setColor(c)}>{c}</button>)}</div></div> : null}
+    {selected && <div className="selectedVariant" aria-live="polite"><span>{selected.size || selected.label || ''}{selected.color || selected.colour ? ` · ${selected.color || selected.colour}` : ''}</span><b>{unavailable ? 'Out of stock' : stock <= 5 ? `Only ${stock} left` : 'In stock'}</b></div>}
     <div className="pdpActions">
       <button type="button" className="button secondary" disabled={busy !== null || !selectedVariant} onClick={toggleWishlist}>{busy === 'wishlist' ? 'SAVING…' : '♡ WISHLIST'}</button>
       <button type="button" className="button secondary" disabled={busy !== null || unavailable} onClick={() => void addToBag(false)}>{busy === 'bag' ? 'ADDING…' : 'ADD TO BAG'}</button>
