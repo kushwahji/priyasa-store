@@ -22,14 +22,10 @@ export default function Checkout() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const loadQuote = useCallback(async (code = coupon) => {
-    try {
-      const r = await api<any>('/storefront/checkout/validate', { method: 'POST', body: JSON.stringify({ coupon_code: code || '' }) });
-      setQuote(quoteOf(r));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to validate your bag.');
-    }
-  }, [coupon]);
+  const loadQuote = useCallback(async (code: string) => {
+    const r = await api<any>('/storefront/checkout/validate', { method: 'POST', body: JSON.stringify({ coupon_code: code || '' }) });
+    setQuote(quoteOf(r));
+  }, []);
 
   useEffect(() => {
     (async () => {
