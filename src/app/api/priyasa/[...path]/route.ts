@@ -7,6 +7,17 @@ const UPSTREAM_TIMEOUT_MS = 20_000;
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const PUBLIC_ROUTES = new Set([
+  'auth/send-otp',
+  'auth/verify-otp',
+  'auth/resend-otp',
+  'auth/logout',
+]);
+
+function isAllowedRoute(route: string) {
+  return PUBLIC_ROUTES.has(route) || route === 'device/token' || route.startsWith('storefront/');
+}
+
 function extractToken(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
@@ -32,20 +43,41 @@ function allowedOrigin(request: NextRequest) {
   return !origin || origin === request.nextUrl.origin;
 }
 
+function sessionCookie(response: NextResponse, value: string, maxAge: number) {
+  response.cookies.set(SESSION_COOKIE, value, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge,
+  });
+}
+
 export async function ALL(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   if (!allowedOrigin(request)) return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
 
   const { path } = await context.params;
   const route = path.join('/');
-  const session = request.cookies.get(SESSION_COOKIE)?.value;
 
   if (route === '_session' && request.method === 'GET') {
-    return NextResponse.json({ authenticated: Boolean(session) }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { authenticated: Boolean(request.cookies.get(SESSION_COOKIE)?.value) },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
+  if (!isAllowedRoute(route)) {
+    return NextResponse.json({ message: 'Store API route is not available through this client.' }, { status: 404 });
+  }
+
+  const session = request.cookies.get(SESSION_COOKIE)?.value;
   const target = `${UPSTREAM}/${path.map((part) => encodeURIComponent(part)).join('/')}${request.nextUrl.search}`;
   const headers = new Headers(request.headers);
-  for (const name of ['host', 'content-length', 'cookie', 'origin', 'referer', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'authorization']) headers.delete(name);
+
+  for (const name of ['host', 'content-length', 'cookie', 'origin', 'referer', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'authorization']) {
+    headers.delete(name);
+  }
+
   if (session) headers.set('Authorization', `Bearer ${session}`);
   if (!headers.has('x-correlation-id')) headers.set('x-correlation-id', crypto.randomUUID());
 
@@ -55,10 +87,23 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   let upstream: Response;
 
   try {
-    upstream = await fetch(target, { method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal: controller.signal });
+    upstream = await fetch(target, {
+      method: request.method,
+      headers,
+      body,
+      cache: 'no-store',
+      redirect: 'manual',
+      signal: controller.signal,
+    });
   } catch (error) {
-    console.error('[PRIYASA BFF] upstream request failed', { target, method: request.method, error: error instanceof Error ? error.message : String(error) });
-    const message = error instanceof Error && error.name === 'AbortError' ? 'PriyasaCore request timed out.' : 'PriyasaCore is temporarily unavailable.';
+    console.error('[PRIYASA BFF] upstream request failed', {
+      target,
+      method: request.method,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    const message = error instanceof Error && error.name === 'AbortError'
+      ? 'PriyasaCore request timed out.'
+      : 'PriyasaCore is temporarily unavailable.';
     return NextResponse.json({ message }, { status: 502 });
   } finally {
     clearTimeout(timeout);
@@ -69,6 +114,7 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   const responseHeaders = new Headers();
   responseHeaders.set('Content-Type', contentType || 'application/json');
   responseHeaders.set('Cache-Control', 'no-store');
+
   for (const name of ['etag', 'x-request-id', 'x-correlation-id']) {
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);
@@ -77,6 +123,7 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   const isVerify = route === 'auth/verify-otp' && upstream.ok && contentType.includes('application/json');
   let responseBody = rawBody;
   let token: string | null = null;
+
   if (isVerify) {
     try {
       const payload = JSON.parse(new TextDecoder().decode(rawBody));
@@ -88,25 +135,10 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   }
 
   const response = new NextResponse(responseBody, { status: upstream.status, headers: responseHeaders });
-  const clear = () => response.cookies.set(SESSION_COOKIE, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  });
 
-  if (isVerify && token) {
-    response.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30,
-    });
-  }
+  if (isVerify && token) sessionCookie(response, token, 60 * 60 * 24 * 30);
+  if (route === 'auth/logout' || upstream.status === 401) sessionCookie(response, '', 0);
 
-  if (route === 'auth/logout' || upstream.status === 401) clear();
   return response;
 }
 
