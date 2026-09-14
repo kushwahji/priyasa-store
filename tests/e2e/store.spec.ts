@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-async function requireSession(page: Parameters<typeof test>[0]['page']) {
+async function requireSession(page: Page) {
   const token = process.env.PRIYASA_E2E_ACCESS_TOKEN;
   test.skip(!token, 'Set PRIYASA_E2E_ACCESS_TOKEN for authenticated E2E journeys.');
   const url = new URL(process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000');
