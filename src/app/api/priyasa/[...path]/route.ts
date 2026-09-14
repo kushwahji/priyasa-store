@@ -4,6 +4,8 @@ const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_UR
 const SESSION_COOKIE = 'priyasa_access_token';
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'content-length', 'host']);
 const MUTATIONS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const SESSION_ISSUE_PATHS = new Set(['/auth/verify-otp', '/storefront/session/rotate']);
+const SESSION_CLEAR_PATHS = new Set(['/auth/logout', '/storefront/session/logout', '/storefront/session/logout-all']);
 const UPSTREAM_TIMEOUT_MS = 15_000;
 
 function upstreamUrl(path: string[], request: NextRequest) {
@@ -42,6 +44,28 @@ function dataOrNull(value: unknown): Record<string, any> | null {
   return value && typeof value === 'object' ? value as Record<string, any> : null;
 }
 
+function tokenFrom(payload: unknown) {
+  const body = dataOrNull(payload);
+  const data = body?.data && typeof body.data === 'object' ? dataOrNull(body.data) : null;
+  return body?.access_token || body?.token || body?.accessToken || data?.access_token || data?.token || data?.accessToken;
+}
+
+function publicAuthPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object') return payload;
+  const source = payload as Record<string, any>;
+  const data = source.data && typeof source.data === 'object' ? source.data as Record<string, any> : null;
+  const strip = (value: Record<string, any>) => {
+    const copy = { ...value };
+    delete copy.access_token;
+    delete copy.token;
+    delete copy.accessToken;
+    return copy;
+  };
+  const result = strip(source);
+  if (data) result.data = strip(data);
+  return result;
+}
+
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   try {
     if (MUTATIONS.has(request.method) && !allowedOrigin(request)) {
@@ -67,7 +91,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
     const contentType = response.headers.get('content-type') || '';
     const isJson = contentType.includes('application/json');
-    const payload = isJson ? await response.json().catch(() => null) : await response.arrayBuffer();
+    const rawPayload = isJson ? await response.json().catch(() => null) : await response.arrayBuffer();
+    const pathname = `/${path.join('/')}`;
+    const body = isJson && rawPayload && typeof rawPayload === 'object' ? rawPayload as Record<string, any> : null;
+    const token = tokenFrom(rawPayload);
+    const payload = isJson && SESSION_ISSUE_PATHS.has(pathname) ? publicAuthPayload(rawPayload) : rawPayload;
     const result = isJson ? NextResponse.json(payload, { status: response.status }) : new NextResponse(payload, { status: response.status });
 
     response.headers.forEach((value, key) => {
@@ -76,15 +104,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     });
     if (contentType) result.headers.set('content-type', contentType);
 
-    const pathname = `/${path.join('/')}`;
-    const body = isJson && payload && typeof payload === 'object' ? payload as Record<string, any> : null;
-    const data = body?.data && typeof body.data === 'object' ? dataOrNull(body.data) : null;
-    const token = body?.access_token || body?.token || body?.accessToken || data?.access_token || data?.token || data?.accessToken;
-
-    if (response.ok && (pathname === '/auth/verify-otp' || pathname === '/storefront/session/rotate') && typeof token === 'string' && token.length > 0) {
+    if (response.ok && SESSION_ISSUE_PATHS.has(pathname) && typeof token === 'string' && token.length > 0) {
       result.cookies.set(sessionCookieOptions(token, 60 * 60 * 24 * 30));
     }
-    if (pathname === '/auth/logout' || pathname === '/storefront/session/logout' || pathname === '/storefront/session/logout-all' || response.status === 401) {
+    if (SESSION_CLEAR_PATHS.has(pathname) || response.status === 401) {
       clearSession(result);
     }
     return result;
