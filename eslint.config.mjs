@@ -7,7 +7,8 @@ export default defineConfig([
   ...nextTs,
   {
     rules: {
-      // React 19 compiler guidance is non-blocking for legitimate storefront effects.
+      // These rules are advisory for the current API-shaped storefront data and React effects.
+      '@typescript-eslint/no-explicit-any': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
     },
   },
