@@ -15,8 +15,6 @@ function transactionStatuses(v: any): string[] {
   return Array.isArray(v?.paymentTransactions) ? v.paymentTransactions.map((x: any) => String(x?.status ?? '').toLowerCase().trim()).filter(Boolean) : [];
 }
 function isSettled(v: any): boolean {
-  // Prefer the authoritative order/payment status. A historical successful transaction
-  // must not make a currently-pending order look paid in the browser.
   const primary = statusValues(v);
   if (primary.length) return primary.some(s => ['paid', 'captured', 'success', 'successful', 'completed'].includes(s));
   return transactionStatuses(v).some(s => ['paid', 'captured', 'success', 'successful', 'completed'].includes(s));
@@ -40,12 +38,12 @@ export default function PaymentPage() {
 
     (async () => {
       try {
-        // Always ask Core for the authoritative order/payment state first. This prevents
-        // reopening Razorpay for an order that was already captured by a previous attempt.
-        const statusResponse = await api<any>(`/storefront/orders/${encodeURIComponent(id)}/payment`);
+        // The documented contract exposes authoritative order state at the order endpoint.
+        // Do not invent a GET /payment route just to inspect payment status.
+        const statusResponse = await api<any>(`/storefront/orders/${encodeURIComponent(id)}`);
         const current = unwrap(statusResponse);
         if (isSettled(current)) { window.location.assign(`/orders/${encodeURIComponent(id)}`); return; }
-        if (isFailed(current) && statusValues(current).includes('refunded')) { throw new Error('This payment has already been refunded.'); }
+        if (isFailed(current) && statusValues(current).includes('refunded')) throw new Error('This payment has already been refunded.');
 
         setMessage('Preparing secure payment…');
         const r = await api<any>(`/storefront/orders/${encodeURIComponent(id)}/payment`, { method: 'POST', body: JSON.stringify({}) });
@@ -71,9 +69,9 @@ export default function PaymentPage() {
               setBusy(true); setMessage('Verifying your payment…'); setError('');
               await api(`/storefront/orders/${encodeURIComponent(id)}/payment/capture`, { method: 'POST', body: JSON.stringify({ provider_payment_id: response.razorpay_payment_id, provider_order_id: response.razorpay_order_id, signature: response.razorpay_signature, payload: response }) });
 
-              // Capture is not treated as success by the browser. Confirm the persisted
-              // state from Core before navigating to the order page.
-              const confirmed = unwrap(await api<any>(`/storefront/orders/${encodeURIComponent(id)}/payment`));
+              // Never treat the browser callback itself as payment success. Confirm the
+              // persisted order state from PriyasaCore before navigating to the order page.
+              const confirmed = unwrap(await api<any>(`/storefront/orders/${encodeURIComponent(id)}`));
               if (!isSettled(confirmed)) throw new Error('Payment was submitted but PriyasaCore has not confirmed it yet. Please check the order status before trying again.');
               window.location.assign(`/orders/${encodeURIComponent(id)}`);
             } catch (e) { setError(e instanceof Error ? e.message : 'Payment verification failed.'); setBusy(false); }
