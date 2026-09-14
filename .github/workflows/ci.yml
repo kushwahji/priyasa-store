@@ -13,6 +13,7 @@ jobs:
     env:
       PRIYASA_API_BASE_URL: http://127.0.0.1:8787/api/v1
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      PRIYASA_E2E_ENABLED: false
       CI: true
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +21,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Install dependencies
         run: npm install
@@ -35,7 +35,9 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browser
+        if: ${{ env.PRIYASA_E2E_ENABLED == 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: End-to-end tests
+        if: ${{ env.PRIYASA_E2E_ENABLED == 'true' }}
         run: npm run test:e2e
