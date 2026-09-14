@@ -22,64 +22,44 @@ export default function Checkout() {
   const [message, setMessage] = useState('');
 
   const loadAddresses = useCallback(async () => {
-    const r = await api<any>('/storefront/checkout/addresses');
+    const r = await api<any>('/storefront/addresses');
     const list = addressesOf(r);
     setAddresses(list);
     const preferred = list.find(a => a.is_default || a.default || a.default_address) || list[0];
     if (preferred) setSelected(String(preferred.id));
   }, []);
 
-  const refreshQuote = useCallback(async (addressId: string, couponCode: string) => {
-    if (!addressId) { setQuote(null); return; }
-    setValidating(true); setError('');
+  const validateCoupon = useCallback(async (couponCode: string) => {
+    setValidating(true); setError(''); setMessage('');
     try {
-      const r = await api<any>('/storefront/checkout/quote', {
+      const r = await api<any>('/storefront/checkout/validate', {
         method: 'POST',
-        body: JSON.stringify({ shipping_address_id: Number(addressId), coupon_code: couponCode.trim().toUpperCase() || undefined }),
+        body: JSON.stringify({ coupon_code: couponCode.trim().toUpperCase() }),
       });
       setQuote(unwrap(r));
+      setMessage(couponCode.trim() ? 'Coupon validated by PriyasaCore.' : 'Checkout validated.');
     } catch (e) {
       setQuote(null);
-      setError(e instanceof Error ? e.message : 'Unable to calculate checkout quote.');
+      setError(e instanceof Error ? e.message : 'Unable to validate checkout.');
     } finally { setValidating(false); }
   }, []);
 
   useEffect(() => {
     (async () => {
       setLoading(true); setError('');
-      try { await loadAddresses(); }
+      try { await loadAddresses(); await validateCoupon(''); }
       catch (e) { setError(e instanceof Error ? e.message : 'Unable to load checkout.'); }
       finally { setLoading(false); }
     })();
-  }, [loadAddresses]);
-
-  useEffect(() => {
-    if (selected) void refreshQuote(selected, coupon);
-  }, [selected, refreshQuote]);
-
-  async function applyCoupon() {
-    setMessage('');
-    await refreshQuote(selected, coupon);
-    if (!error) setMessage(coupon.trim() ? 'Coupon checked with PriyasaCore.' : 'Coupon removed.');
-  }
+  }, [loadAddresses, validateCoupon]);
 
   async function placeOrder() {
     if (!selected) { setError('Select a delivery address.'); return; }
-    if (!quote) { setError('Checkout quote is not ready.'); return; }
-    const deliveryAvailable = quote?.delivery?.serviceable ?? quote?.serviceable ?? quote?.delivery_available;
-    const codEligible = quote?.cod?.eligible ?? quote?.cod_eligible ?? quote?.payment?.cod_eligible;
-    if (deliveryAvailable === false) { setError('Delivery is not available for this address.'); return; }
-    if (paymentMethod === 'cod' && codEligible === false) { setError('Cash on Delivery is not available for this order/address.'); return; }
-
     setBusy(true); setError(''); setMessage('');
     try {
-      const r = await api<any>('/storefront/checkout/place', {
+      const r = await api<any>('/storefront/checkout/create-order', {
         method: 'POST',
-        body: JSON.stringify({
-          shipping_address_id: Number(selected),
-          coupon_code: coupon.trim().toUpperCase() || undefined,
-          payment_method: paymentMethod,
-        }),
+        body: JSON.stringify({ shipping_address_id: Number(selected), coupon_code: coupon.trim().toUpperCase() || undefined, payment_method: paymentMethod }),
       });
       const v = unwrap(r);
       const orderId = v.order?.id ?? v.id ?? v.order_id;
@@ -88,11 +68,6 @@ export default function Checkout() {
       else window.location.assign(`/checkout/payment?order=${encodeURIComponent(String(orderId))}`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to place your order.'); setBusy(false); }
   }
-
-  const shipping = quote?.shipping_charge ?? quote?.shipping_total ?? quote?.shipping?.amount;
-  const total = quote?.grand_total ?? quote?.total;
-  const deliveryAvailable = quote?.delivery?.serviceable ?? quote?.serviceable ?? quote?.delivery_available;
-  const codEligible = quote?.cod?.eligible ?? quote?.cod_eligible ?? quote?.payment?.cod_eligible;
 
   return <main className="checkoutPage">
     <div className="sectionHead"><div><span className="eyebrow">PRIYASA / CHECKOUT</span><h1>Secure checkout</h1><p className="muted">Address → delivery → payment → confirmation</p></div><Link className="textLink" href="/cart">← Bag</Link></div>
@@ -109,19 +84,18 @@ export default function Checkout() {
           <Link className="textLink" href="/addresses">+ Manage addresses</Link>
         </div>
         <div className="checkoutCard"><span className="eyebrow">STEP 2</span><h2>Offers & coupon</h2>
-          <div className="coupon"><input aria-label="Coupon code" value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())} placeholder="Enter coupon code"/><button type="button" onClick={() => void applyCoupon()} disabled={validating}>{validating ? 'Checking…' : 'Apply'}</button></div>
+          <div className="coupon"><input aria-label="Coupon code" value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())} placeholder="Enter coupon code"/><button type="button" onClick={() => void validateCoupon(coupon)} disabled={validating}>{validating ? 'Checking…' : 'Apply'}</button></div>
         </div>
         <div className="checkoutCard"><span className="eyebrow">STEP 3</span><h2>Payment method</h2>
           <div className="paymentOptions">
             <button type="button" className={`paymentChoice ${paymentMethod === 'razorpay' ? 'selected' : ''}`} onClick={() => setPaymentMethod('razorpay')}><b>Razorpay</b><span>UPI, cards, net banking and wallets</span></button>
-            <button type="button" disabled={codEligible === false} className={`paymentChoice ${paymentMethod === 'cod' ? 'selected' : ''}`} onClick={() => setPaymentMethod('cod')}><b>Cash on Delivery</b><span>{codEligible === false ? 'Not available for this order/address.' : 'Final eligibility is enforced by PriyasaCore.'}</span></button>
+            <button type="button" className={`paymentChoice ${paymentMethod === 'cod' ? 'selected' : ''}`} onClick={() => setPaymentMethod('cod')}><b>Cash on Delivery</b><span>Final eligibility is enforced by PriyasaCore.</span></button>
           </div>
-          {deliveryAvailable === false && <p className="formError">Delivery is not available for this address.</p>}
           <p className="muted">Payment is verified server-side by PriyasaCore. The browser never marks an order as paid.</p>
         </div>
       </section>
       <aside className="summary"><span className="eyebrow">ORDER SUMMARY</span>
-        {quote ? <><p>Subtotal and discounts are calculated by PriyasaCore.</p>{shipping != null && <p>Shipping: ₹{Number(shipping).toLocaleString('en-IN')}</p>}{total != null && <><hr/><p><b>Total: ₹{Number(total).toLocaleString('en-IN')}</b></p></>}<button className="button" disabled={busy || validating || !selected || !quote || deliveryAvailable === false || (paymentMethod === 'cod' && codEligible === false)} onClick={() => void placeOrder()}>{busy ? (paymentMethod === 'cod' ? 'Placing order…' : 'Creating secure order…') : (paymentMethod === 'cod' ? 'Place COD order' : 'Continue to payment')}</button></> : <p>Calculating your authoritative checkout quote…</p>}
+        {quote ? <><p>Checkout validation is handled by PriyasaCore.</p><button className="button" disabled={busy || validating || !selected} onClick={() => void placeOrder()}>{busy ? (paymentMethod === 'cod' ? 'Placing order…' : 'Creating secure order…') : (paymentMethod === 'cod' ? 'Place COD order' : 'Continue to payment')}</button></> : <p>Validating your checkout with PriyasaCore…</p>}
       </aside>
     </div>}
   </main>;
