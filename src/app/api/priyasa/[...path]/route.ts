@@ -16,6 +16,17 @@ function extractToken(value: unknown): string | null {
   return null;
 }
 
+function stripToken(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(stripToken);
+  const record = { ...(value as Record<string, unknown>) };
+  delete record.access_token;
+  delete record.accessToken;
+  delete record.token;
+  if (record.data && typeof record.data === 'object') record.data = stripToken(record.data);
+  return record;
+}
+
 function allowedOrigin(request: NextRequest) {
   const origin = request.headers.get('origin');
   return !origin || origin === request.nextUrl.origin;
@@ -44,36 +55,36 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   let upstream: Response;
 
   try {
-    upstream = await fetch(target, {
-      method: request.method,
-      headers,
-      body,
-      cache: 'no-store',
-      redirect: 'manual',
-      signal: controller.signal,
-    });
+    upstream = await fetch(target, { method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal: controller.signal });
   } catch (error) {
-    console.error('[PRIYASA BFF] upstream request failed', {
-      target,
-      method: request.method,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    const message = error instanceof Error && error.name === 'AbortError'
-      ? 'PriyasaCore request timed out.'
-      : 'PriyasaCore is temporarily unavailable.';
+    console.error('[PRIYASA BFF] upstream request failed', { target, method: request.method, error: error instanceof Error ? error.message : String(error) });
+    const message = error instanceof Error && error.name === 'AbortError' ? 'PriyasaCore request timed out.' : 'PriyasaCore is temporarily unavailable.';
     return NextResponse.json({ message }, { status: 502 });
   } finally {
     clearTimeout(timeout);
   }
 
   const contentType = upstream.headers.get('content-type') || '';
-  const responseBody = await upstream.arrayBuffer();
+  const rawBody = await upstream.arrayBuffer();
   const responseHeaders = new Headers();
   responseHeaders.set('Content-Type', contentType || 'application/json');
   responseHeaders.set('Cache-Control', 'no-store');
   for (const name of ['etag', 'x-request-id', 'x-correlation-id']) {
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);
+  }
+
+  const isVerify = route === 'auth/verify-otp' && upstream.ok && contentType.includes('application/json');
+  let responseBody = rawBody;
+  let token: string | null = null;
+  if (isVerify) {
+    try {
+      const payload = JSON.parse(new TextDecoder().decode(rawBody));
+      token = extractToken(payload);
+      responseBody = new TextEncoder().encode(JSON.stringify(stripToken(payload))).buffer;
+    } catch {
+      // Preserve the upstream response if it is not valid JSON.
+    }
   }
 
   const response = new NextResponse(responseBody, { status: upstream.status, headers: responseHeaders });
@@ -85,19 +96,14 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
     maxAge: 0,
   });
 
-  if (route === 'auth/verify-otp' && upstream.ok && contentType.includes('application/json')) {
-    try {
-      const token = extractToken(JSON.parse(new TextDecoder().decode(responseBody)));
-      if (token) response.cookies.set(SESSION_COOKIE, token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30,
-      });
-    } catch {
-      // Keep the upstream response intact; the client still receives the original API response.
-    }
+  if (isVerify && token) {
+    response.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
   }
 
   if (route === 'auth/logout' || upstream.status === 401) clear();
