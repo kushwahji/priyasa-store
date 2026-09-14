@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './responsive-overrides.css';
+import './home-dynamic.css';
 import StoreShell from '@/components/StoreShell';
 
 const siteUrl = process.env.NEXT_PUBLIC_STORE_URL || 'http://localhost:3000';
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'PRIYASA',
     title: 'PRIYASA — Every You, Beautiful',
-    description: 'Contemporary Indian fashion, everyday essentials and occasion-ready edits.',
+    description: 'Contemporary Indian fashion and everyday essentials.',
     url: siteUrl,
   },
   twitter: {
