@@ -12,6 +12,8 @@ test('home and core commerce navigation render on desktop and mobile', async ({ 
 test('search route is usable', async ({ page }) => {
   await page.goto('/search');
   await expect(page.getByRole('heading', { name: /find your next priyasa edit/i })).toBeVisible();
-  await page.getByLabel('Search products').fill('kurti');
-  await expect(page.getByLabel('Search products')).toHaveValue('kurti');
+  const searchInput = page.locator('input[aria-label="Search products"]').first();
+  await expect(searchInput).toBeVisible();
+  await searchInput.fill('kurti');
+  await expect(searchInput).toHaveValue('kurti');
 });
