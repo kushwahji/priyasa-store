@@ -8,21 +8,30 @@ import { api } from '@/lib/api';
 function unwrap(r: any) { return r?.data?.order ?? r?.data ?? r?.order ?? r ?? {}; }
 function money(v: any) { return `₹${Number(v || 0).toLocaleString('en-IN')}`; }
 function label(v: any) { return String(v || 'processing').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function timelineOf(r: any): any[] { const v = r?.data ?? r ?? {}; return Array.isArray(v) ? v : v.timeline ?? v.events ?? v.activities ?? []; }
 
 export default function OrderDetail() {
   const params = useParams<{ id: string }>();
   const id = params?.id || '';
   const [order, setOrder] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(false);
+  const [reorderBusy, setReorderBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true); setError('');
-    try { setOrder(unwrap(await api<any>(`/storefront/orders/${encodeURIComponent(id)}`))); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load this order.'); }
+    try {
+      const [orderResponse, timelineResponse] = await Promise.all([
+        api<any>(`/storefront/orders/${encodeURIComponent(id)}`),
+        api<any>(`/orders/${encodeURIComponent(id)}/timeline`).catch(() => null),
+      ]);
+      setOrder(unwrap(orderResponse));
+      setTimeline(timelineResponse ? timelineOf(timelineResponse) : []);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load this order.'); }
     finally { setLoading(false); }
   }, [id]);
 
@@ -36,6 +45,19 @@ export default function OrderDetail() {
       setMessage('Cancellation requested.'); await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to cancel this order.'); }
     finally { setActionBusy(false); }
+  }
+
+  async function reorder() {
+    setReorderBusy(true); setError(''); setMessage('');
+    try {
+      const response = await api<any>(`/orders/${encodeURIComponent(id)}/reorder`);
+      const data = response?.data ?? response ?? {};
+      const cart = data.cart ?? data;
+      if (data.checkout_url || data.redirect_url) window.location.assign(data.checkout_url || data.redirect_url);
+      else if (cart?.id || cart?.items || response) setMessage('Items from this order were added to your bag.');
+      else setMessage('Reorder is not available for this order.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to reorder this order.'); }
+    finally { setReorderBusy(false); }
   }
 
   if (loading) return <main className="accountPage"><div className="emptyState"><h2>Loading order…</h2></div></main>;
@@ -66,7 +88,7 @@ export default function OrderDetail() {
           {paymentSettled && <div className="formMessage" role="status">Payment confirmed by PRIYASA Core.</div>}
           {items.length ? <div className="orderLines">{items.map((item:any,i:number) => <article key={String(item.id || i)} className="orderLine"><div className="cartThumb">{(item.image || item.product?.image || item.product?.media?.[0]?.url) && <img src={item.image || item.product?.image || item.product?.media?.[0]?.url} alt="" />}</div><div><strong>{item.product_name || item.name || item.product?.name || 'PRIYASA product'}</strong><small>{item.variant_label || item.size || item.variant?.label || 'Standard'} · Qty {item.quantity || 1}</small><b>{money(item.line_total ?? item.total ?? item.unit_price ?? item.price)}</b></div></article>)}</div> : <p className="muted">Order items are not available in this response.</p>}
         </div>
-        <div className="checkoutCard"><span className="eyebrow">ORDER TIMELINE</span><div className="timeline"><div><b>Order placed</b><span>{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Confirmed by PRIYASA'}</span></div><div className={terminal ? 'done' : ''}><b>{label(status)}</b><span>Current order status</span></div></div></div>
+        <div className="checkoutCard"><span className="eyebrow">ORDER TIMELINE</span>{timeline.length ? <div className="timeline">{timeline.map((event:any,i:number) => <div className={event.completed === true || i === 0 ? 'done' : ''} key={String(event.id || event.uuid || event.created_at || i)}><b>{label(event.status || event.event || event.type || event.title || 'Order update')}</b><span>{event.description || event.message || event.created_at || event.occurred_at || ''}</span></div>)}</div> : <div className="timeline"><div className="done"><b>Order placed</b><span>{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Confirmed by PRIYASA'}</span></div><div><b>{label(status)}</b><span>Current order status</span></div></div>}</div>
         {address && <div className="checkoutCard"><span className="eyebrow">DELIVERY ADDRESS</span><p><strong>{address.name || address.full_name || 'Delivery address'}</strong><br />{[address.address_line1 || address.line1, address.address_line2 || address.line2, address.city, address.state, address.postal_code || address.pincode].filter(Boolean).join(', ')}</p></div>}
       </section>
       <aside className="summary">
@@ -75,6 +97,7 @@ export default function OrderDetail() {
         {cancellable && <button className="button secondary" type="button" disabled={actionBusy} onClick={() => void cancelOrder()}>{actionBusy ? 'Cancelling…' : 'Cancel order'}</button>}
         {returnRequestable && <Link className="button secondary" href={`/returns/request?order=${encodeURIComponent(String(order.id || id))}`}>Request return</Link>}
         {order.id && <><Link className="button" href={`/orders/${encodeURIComponent(String(order.id))}/tracking`}>Track order</Link><Link className="textLink" href={`/orders/${encodeURIComponent(String(order.id))}/invoice`}>View invoice →</Link></>}
+        <button className="button secondary" type="button" disabled={reorderBusy} onClick={() => void reorder()}>{reorderBusy ? 'Adding…' : 'Buy again'}</button>
       </aside>
     </div>
   </main>;
