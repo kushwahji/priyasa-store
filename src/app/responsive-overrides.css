@@ -12,3 +12,10 @@
   .authPage{position:relative;min-height:calc(100svh - 86px);padding:0!important;background:rgba(40,44,63,.16)}.authBackdrop{position:fixed;inset:86px 0 68px;background:rgba(25,25,30,.38);z-index:550}.authCard{position:fixed;z-index:600;left:0;right:0;bottom:0;width:100%;max-width:none;margin:0;padding:14px 18px calc(20px + env(safe-area-inset-bottom));border:0;border-top:1px solid var(--line);border-radius:20px 20px 0 0;box-shadow:0 -16px 50px rgba(40,44,63,.22);max-height:90svh;overflow:auto}.authHandle{display:block;width:38px;height:4px;border-radius:99px;background:#d5d6dc;margin:0 auto 15px}.authCard h1{font-size:29px;margin:7px 0}.authCard label{margin-top:14px}.authCard input{height:50px}.authCard>.button{min-height:48px}.authCard .textButton{min-height:34px}.authPage .bottomNav{display:none}
 }
 @media (min-width:701px){.authHandle{display:none}.authBackdrop{display:none}}
+
+/* Canonical PRIYASA brand asset. The same SVG is used in desktop, mobile and footer chrome. */
+.logo{display:inline-flex;align-items:center;flex:0 0 auto}
+.logo img{display:block;width:154px;height:auto;max-height:40px;object-fit:contain}
+.footerLogo img{width:170px;max-height:42px}
+.mobileMenuHead .logo img{width:142px;max-height:36px}
+@media (max-width:700px){.logo img{width:126px;max-height:32px}.mobileMenuHead .logo img{width:138px}.footerLogo img{width:150px}}
