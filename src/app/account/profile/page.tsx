@@ -1,0 +1,11 @@
+'use client';
+
+import AuthGuard from '@/components/AuthGuard';
+import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
+
+function Profile(){const[c,setC]=useState<any>(null),[first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState(''),[marketing,setMarketing]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
+ useEffect(()=>{void(async()=>{try{const r=await api<any>('/storefront/me');const v=r?.data??r;c??setC(v);setFirst(v?.first_name||'');setLast(v?.last_name||'');setEmail(v?.email||'');setMarketing(Boolean(v?.marketing_opt_in))}catch(e){setError(e instanceof Error?e.message:'Unable to load profile.')}finally{setLoading(false)}})()},[]);
+ async function save(){setBusy(true);setError('');setMessage('');try{const r=await api<any>('/storefront/me',{method:'PATCH',body:JSON.stringify({first_name:first.trim()||undefined,last_name:last.trim()||undefined,email:email.trim()||undefined,marketing_opt_in:marketing})});setC(r?.data??r);setMessage('Profile updated successfully.')}catch(e){setError(e instanceof Error?e.message:'Unable to update profile.')}finally{setBusy(false)}}
+ return <main className="accountPage"><span className="eyebrow">MY PRIYASA / PROFILE</span><h1>Profile</h1>{loading?<p className="muted">Loading profile…</p>:<section className="authCard"><label>First name<input value={first} onChange={e=>setFirst(e.target.value)} maxLength={100}/></label><label>Last name<input value={last} onChange={e=>setLast(e.target.value)} maxLength={100}/></label><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} maxLength={255}/></label><label className="checkRow"><input type="checkbox" checked={marketing} onChange={e=>setMarketing(e.target.checked)}/> Receive PRIYASA offers and updates</label>{error&&<div className="formError" role="alert">{error}</div>}{message&&<div className="formMessage" role="status">{message}</div>}<button className="button" disabled={busy} onClick={()=>void save()}>{busy?'Saving…':'Save profile'}</button></section>}</main>}
+export default function ProfilePage(){return <AuthGuard><Profile/></AuthGuard>}
