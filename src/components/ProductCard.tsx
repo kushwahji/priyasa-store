@@ -1,13 +1,6 @@
 import Link from 'next/link';
-
-type Product = { id?: string|number; slug?: string; name: string; category?: string; price?: number; mrp?: number; image?: string };
-
-export default function ProductCard({ product }: { product: Product }) {
-  const price = Number(product.price || 0);
-  const mrp = Number(product.mrp || 0);
-  const discount = mrp > price ? Math.round((1 - price / mrp) * 100) : 0;
-  return <Link className="productCard" href={`/product/${product.slug || product.id || ''}`}>
-    <div className="productImage">{product.image ? <img src={product.image} alt={product.name} loading="lazy" /> : null}{discount > 0 && <span className="productBadge">{discount}% OFF</span>}<button className="heart" aria-label={`Wishlist ${product.name}`} onClick={e => e.preventDefault()}>♡</button></div>
-    <div className="productInfo"><strong>{product.name}</strong><small>{product.category || 'PRIYASA'}</small><div className="price">₹{price.toLocaleString('en-IN')} {mrp > price && <del>₹{mrp.toLocaleString('en-IN')}</del>}</div></div>
-  </Link>;
+type Product=Record<string,any>;
+export default function ProductCard({product}:{product:Product}){
+ const pricing=product.pricing||{};const price=Number(pricing.selling_price??product.price??0);const mrp=Number(pricing.mrp??product.mrp??0);const discount=Number(pricing.discount_percent)||(mrp>price?Math.round((1-price/mrp)*100):0);const media=Array.isArray(product.media)?product.media:[];const image=media[0]?.url??media[0]??product.image;const category=typeof product.category==='object'?product.category?.name:product.category;
+ return <Link className="productCard" href={`/product/${product.slug||product.id||''}`}><div className="productImage">{image?<img src={image} alt={product.name} loading="lazy"/>:null}{discount>0&&<span className="productBadge">{discount}% OFF</span>}<span className="heart" aria-hidden="true">♡</span></div><div className="productInfo"><strong>{product.name}</strong><small>{category||'PRIYASA'}</small><div className="price">₹{price.toLocaleString('en-IN')} {mrp>price&&<del>₹{mrp.toLocaleString('en-IN')}</del>}</div></div></Link>;
 }
