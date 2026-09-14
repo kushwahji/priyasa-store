@@ -1,4 +1,4 @@
-const SERVER_BASE=(process.env.PRIYASA_API_BASE_URL||process.env.PRIYASA_API_URL||process.env.NEXT_PUBLIC_PRIYASA_API_URL||'http://localhost:8000/api/v1').replace(/\/$/,'');
+const SERVER_BASE=(process.env.PRIYASA_API_BASE_URL||process.env.PRIYASA_API_URL||'https://api.priyasa.com/api/v1').replace(/\/$/,'');
 const BROWSER_BASE='/api/priyasa';
 const SESSION_MARKER='priyasa_session_active';
 
@@ -23,12 +23,19 @@ export async function api<T>(path:string,init:RequestInit={}){
   if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
   const method=(init.method||'GET').toUpperCase();
   if(['POST','PUT','PATCH','DELETE'].includes(method)&&!headers.has('Idempotency-Key'))headers.set('Idempotency-Key',crypto.randomUUID());
-  const res=await fetch(`${base()}${path}`,{...init,headers,cache:'no-store',credentials:'include'});
+
+  let res:Response;
+  try{
+    res=await fetch(`${base()}${path}`,{...init,headers,cache:'no-store',credentials:'include'});
+  }catch(e){
+    throw new Error(e instanceof Error&&e.message?`Unable to reach PriyasaCore: ${e.message}`:'Unable to reach PriyasaCore. Check the Store API connection.');
+  }
+
   if(res.status===401){
     clearAccessToken();
     redirectToLogin();
   }
   const body=await res.json().catch(()=>null);
-  if(!res.ok)throw new Error(body?.message||`PRIYASA_API_${res.status}`);
+  if(!res.ok)throw new Error(body?.message||body?.error||`PRIYASA_API_${res.status}`);
   return body as T;
 }
