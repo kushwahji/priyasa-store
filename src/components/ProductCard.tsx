@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { api } from '@/lib/api';
 
 type Product = Record<string, any>;
@@ -25,7 +25,7 @@ export default function ProductCard({ product }: { product: Product }) {
   const shareUrl = storeUrl ? `${storeUrl}/product/${encodeURIComponent(String(key))}` : '';
   const whatsapp = `https://wa.me/918104132334?text=${encodeURIComponent(`Hi PRIYASA, I want to order this product.\nProduct: ${product.name}\nPrice: ₹${price.toLocaleString('en-IN')}\n${mrp > price ? `MRP: ₹${mrp.toLocaleString('en-IN')}` : ''}${shareUrl ? `\nLink: ${shareUrl}` : ''}`)}`;
 
-  async function toggleWishlist(event: React.MouseEvent<HTMLButtonElement>) {
+  async function toggleWishlist(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
     if (!variantId || saving) return;
@@ -35,11 +35,8 @@ export default function ProductCard({ product }: { product: Product }) {
       await api('/storefront/wishlist/toggle', { method: 'POST', body: JSON.stringify({ variant_id: variantId }) });
       setWishlisted((value) => !value);
     } catch (error) {
-      if (error instanceof Error && /401|unauthorized|authentication/i.test(error.message)) {
-        window.location.assign('/auth/login');
-      } else {
-        setWishError(error instanceof Error ? error.message : 'Unable to update wishlist');
-      }
+      if (error instanceof Error && /401|unauthorized|authentication/i.test(error.message)) window.location.assign('/auth/login');
+      else setWishError(error instanceof Error ? error.message : 'Unable to update wishlist');
     } finally {
       setSaving(false);
     }
@@ -47,13 +44,17 @@ export default function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="productCard">
+      <div className="productImageWrap">
+        <Link href={`/product/${encodeURIComponent(String(key))}`} className="productCardLink">
+          <div className="productImage">
+            {image ? <img src={image} alt={product.name} loading="lazy" /> : <div className="productImagePlaceholder">PRIYASA</div>}
+            {discount > 0 && <span className="productBadge">{discount}% OFF</span>}
+          </div>
+        </Link>
+        <button type="button" className={`productHeart${wishlisted ? ' isWishlisted' : ''}`} onClick={toggleWishlist} aria-label={wishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`} aria-pressed={wishlisted} disabled={saving}>{wishlisted ? '♥' : '♡'}</button>
+        {(saving || wishError) && <span className="productQuickLabel">{saving ? 'Saving…' : wishError}</span>}
+      </div>
       <Link href={`/product/${encodeURIComponent(String(key))}`} className="productCardLink">
-        <div className="productImage">
-          {image ? <img src={image} alt={product.name} loading="lazy" /> : <div className="productImagePlaceholder">PRIYASA</div>}
-          {discount > 0 && <span className="productBadge">{discount}% OFF</span>}
-          <button type="button" className={`productHeart${wishlisted ? ' isWishlisted' : ''}`} onClick={toggleWishlist} aria-label={wishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`} aria-pressed={wishlisted} disabled={saving}>{wishlisted ? '♥' : '♡'}</button>
-          <span className="productQuickLabel">{saving ? 'Saving…' : wishError || ''}</span>
-        </div>
         <div className="productInfo">
           <strong>{product.brand || 'PRIYASA'}</strong>
           <span className="productName">{product.name}</span>
