@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || '').replace(/\/$/, '');
-
-const blockedHeaders = new Set(['host', 'content-length', 'connection']);
+const UPSTREAM_TIMEOUT_MS = 15_000;
+const blockedHeaders = new Set(['host', 'content-length', 'connection', 'x-priyasa-store-proxy']);
 
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   if (!API_BASE) {
@@ -20,6 +20,8 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
 
   const hasBody = !['GET', 'HEAD'].includes(request.method);
   const body = hasBody ? await request.arrayBuffer() : undefined;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
   try {
     const upstream = await fetch(target, {
@@ -28,6 +30,7 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
       body,
       cache: 'no-store',
       redirect: 'manual',
+      signal: controller.signal,
     });
 
     const responseHeaders = new Headers();
@@ -42,8 +45,13 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
       statusText: upstream.statusText,
       headers: responseHeaders,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return NextResponse.json({ message: 'PriyasaCore API request timed out' }, { status: 504 });
+    }
     return NextResponse.json({ message: 'Unable to reach PriyasaCore API' }, { status: 502 });
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -53,3 +61,5 @@ export const PUT = forward;
 export const PATCH = forward;
 export const DELETE = forward;
 export const HEAD = forward;
+
+export const dynamic = 'force-dynamic';
