@@ -41,20 +41,21 @@ test.describe('PRIYASA storefront smoke', () => {
     await expect(page.locator('.bottomNav')).toBeVisible();
   });
 
-  test('checkout loads Core P40 addresses and quote', async ({ page }) => {
+  test('authenticated checkout loads saved addresses and authoritative quote', async ({ page }) => {
     await requireSession(page);
     const addresses = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/addresses') && r.request().method() === 'GET');
     await page.goto('/checkout');
     const response = await addresses;
     expect(response.status()).toBeLessThan(500);
     await expect(page.getByText('Delivery address')).toBeVisible();
-    const quote = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/quote') && r.request().method() === 'POST').catch(() => null);
+
+    const quote = page.waitForResponse(r => r.url().includes('/api/priyasa/storefront/checkout/quote') && r.request().method() === 'POST');
     await page.waitForTimeout(500);
     const quoteResponse = await quote;
-    if (quoteResponse) expect(quoteResponse.status()).toBeLessThan(500);
+    expect(quoteResponse.status()).toBeLessThan(500);
   });
 
-  test('checkout coupon refresh uses the documented P40 quote contract', async ({ page }) => {
+  test('checkout coupon refresh uses the current quote contract', async ({ page }) => {
     await requireSession(page);
     await page.goto('/checkout');
     await expect(page.getByText('Offers & coupon')).toBeVisible();
@@ -65,7 +66,7 @@ test.describe('PRIYASA storefront smoke', () => {
     expect(response.status()).toBeLessThan(500);
   });
 
-  test('payment page checks authoritative Core status before creating checkout', async ({ page }) => {
+  test('payment page checks authoritative Core payment state first', async ({ page }) => {
     await requireSession(page);
     const orderId = process.env.PRIYASA_E2E_PAYMENT_ORDER_ID;
     test.skip(!orderId, 'Set PRIYASA_E2E_PAYMENT_ORDER_ID to exercise a real unpaid Razorpay order.');
