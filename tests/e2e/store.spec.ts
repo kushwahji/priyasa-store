@@ -4,7 +4,7 @@ async function requireSession(page: Page) {
   const token = process.env.PRIYASA_E2E_ACCESS_TOKEN;
   test.skip(!token, 'Set PRIYASA_E2E_ACCESS_TOKEN for authenticated E2E journeys.');
   const url = new URL(process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000');
-  await page.context().addCookies([{ name: 'priyasa_session', value: token!, domain: url.hostname, path: '/', secure: url.protocol === 'https:', httpOnly: true, sameSite: 'Lax' }]);
+  await page.context().addCookies([{ name: 'priyasa_access_token', value: token!, domain: url.hostname, path: '/', secure: url.protocol === 'https:', httpOnly: true, sameSite: 'Lax' }]);
 }
 
 test.describe('PRIYASA storefront smoke', () => {
@@ -58,7 +58,7 @@ test.describe('PRIYASA storefront smoke', () => {
     test.skip(!process.env.PRIYASA_E2E_MOBILE || !process.env.PRIYASA_E2E_OTP, 'Set PRIYASA_E2E_MOBILE and PRIYASA_E2E_OTP for a real deployed OTP journey.');
     await page.goto('/auth/login?next=/account'); await page.getByLabel('Mobile number').fill(process.env.PRIYASA_E2E_MOBILE!); await page.getByRole('button', { name: 'Send OTP' }).click();
     await expect(page.getByLabel('OTP')).toBeVisible(); await page.getByLabel('OTP').fill(process.env.PRIYASA_E2E_OTP!); await page.getByRole('button', { name: 'Verify & continue' }).click();
-    await expect(page).toHaveURL(/\/account/); const cookies = await page.context().cookies(); expect(cookies.find(c => c.name === 'priyasa_session')?.httpOnly).toBeTruthy();
+    await expect(page).toHaveURL(/\/account/); const cookies = await page.context().cookies(); expect(cookies.find(c => c.name === 'priyasa_access_token')?.httpOnly).toBeTruthy();
   });
 
   test('guest protected route returns to login', async ({ page }) => { await page.goto('/cart'); await expect(page).toHaveURL(/\/auth\/login\?next=/); });
