@@ -10,6 +10,10 @@ export async function PUT(request: NextRequest) { return proxy(request); }
 export async function PATCH(request: NextRequest) { return proxy(request); }
 export async function DELETE(request: NextRequest) { return proxy(request); }
 
+function sessionCookie(value: string, maxAge: number) {
+  return { name: SESSION_COOKIE, value, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge };
+}
+
 async function proxy(request: NextRequest) {
   const endpoint = request.nextUrl.searchParams.get('_path');
   if (!endpoint || !endpoint.startsWith('/') || endpoint.startsWith('//')) {
@@ -42,7 +46,28 @@ async function proxy(request: NextRequest) {
     return NextResponse.json({ message: 'Unable to reach PriyasaCore API.' }, { status: 502 });
   }
 
-  const body = await upstream.arrayBuffer();
+  let body = await upstream.arrayBuffer();
+  let verifyToken: string | undefined;
+
+  // Never send a bearer credential back to browser JavaScript. The BFF converts
+  // the Core token response into an HttpOnly session cookie instead.
+  if (endpoint === '/auth/verify-otp' && upstream.ok) {
+    try {
+      const payload = JSON.parse(new TextDecoder().decode(body));
+      verifyToken = payload.access_token || payload.token || payload.data?.access_token || payload.data?.token;
+      if (verifyToken) {
+        const sanitized = structuredClone(payload);
+        delete sanitized.access_token;
+        delete sanitized.token;
+        if (sanitized.data && typeof sanitized.data === 'object') {
+          delete sanitized.data.access_token;
+          delete sanitized.data.token;
+        }
+        body = new TextEncoder().encode(JSON.stringify(sanitized)).buffer;
+      }
+    } catch { /* Preserve the upstream response when it is not JSON. */ }
+  }
+
   const response = new NextResponse(body, {
     status: upstream.status,
     statusText: upstream.statusText,
@@ -50,15 +75,11 @@ async function proxy(request: NextRequest) {
   });
 
   if (upstream.status === 401 || endpoint === '/auth/logout') {
-    response.cookies.set({ name: SESSION_COOKIE, value: '', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 0 });
+    response.cookies.set(sessionCookie('', 0));
   }
 
-  if (endpoint === '/auth/verify-otp' && upstream.ok) {
-    try {
-      const payload = JSON.parse(new TextDecoder().decode(body));
-      const accessToken = payload.access_token || payload.token || payload.data?.access_token || payload.data?.token;
-      if (accessToken) response.cookies.set({ name: SESSION_COOKIE, value: accessToken, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: SESSION_MAX_AGE });
-    } catch { /* Preserve the upstream response. */ }
+  if (endpoint === '/auth/verify-otp' && upstream.ok && verifyToken) {
+    response.cookies.set(sessionCookie(verifyToken, SESSION_MAX_AGE));
   }
 
   return response;
