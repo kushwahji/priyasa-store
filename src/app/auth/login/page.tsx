@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { api, clearAccessToken, setAccessToken } from '@/lib/api';
+import { api, clearAccessToken } from '@/lib/api';
 import styles from './page.module.css';
 
-type OtpResponse = { request_id?: string; data?: { request_id?: string }; session?: boolean; token?: string; access_token?: string };
+type OtpResponse = { request_id?: string; data?: { request_id?: string }; session?: boolean };
 
 function safeNext() {
   const value = new URLSearchParams(window.location.search).get('next');
@@ -51,9 +51,7 @@ export default function Login() {
     if (!/^\d{6}$/.test(otp)) { setError('Enter the 6-digit OTP.'); return; }
     setBusy(true);
     try {
-      const r = await api<OtpResponse>('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, otp, request_id: requestId }) });
-      const token = r.access_token || r.token;
-      if (token) setAccessToken(token);
+      await api<OtpResponse>('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, otp, request_id: requestId }) });
       window.location.assign(safeNext());
     } catch (e) { clearAccessToken(); setError(e instanceof Error ? e.message : 'Unable to complete sign in. Please try again.'); }
     finally { setBusy(false); }
