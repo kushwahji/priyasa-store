@@ -30,7 +30,7 @@ function sameOrigin(request: NextRequest) {
 }
 
 function allowedEndpoint(endpoint: string) {
-  return endpoint.startsWith('/auth/') || endpoint.startsWith('/storefront/');
+  return endpoint.startsWith('/auth/') || endpoint.startsWith('/storefront/') || endpoint.startsWith('/orders') || endpoint.startsWith('/cart') || endpoint.startsWith('/wishlist') || endpoint.startsWith('/addresses') || endpoint.startsWith('/checkout') || endpoint.startsWith('/payments') || endpoint.startsWith('/returns') || endpoint.startsWith('/support') || endpoint.startsWith('/customer/');
 }
 
 async function proxy(request: NextRequest) {
@@ -69,15 +69,16 @@ async function proxy(request: NextRequest) {
       cache: 'no-store',
     });
   } catch {
-    return NextResponse.json({ message: 'Unable to reach PriyasaCore API.', correlation_id: correlationId }, { status: 502, headers: { 'X-Correlation-ID': correlationId } });
+    return NextResponse.json({ message: 'Unable to reach PriyasaCore API.', error_code: 'PRIYASA_API_DOWN', correlation_id: correlationId }, { status: 502, headers: { 'X-Correlation-ID': correlationId, 'Cache-Control': 'no-store' } });
   }
 
-  let body: BodyInit = await upstream.arrayBuffer();
+  // Read as text so the Next.js/Node runtime does not have to reconcile ArrayBufferLike with BodyInit.
+  let body = await upstream.text();
   let verifyToken: string | undefined;
 
   if (endpoint === '/auth/verify-otp' && upstream.ok) {
     try {
-      const payload = JSON.parse(new TextDecoder().decode(body as ArrayBuffer));
+      const payload = JSON.parse(body);
       verifyToken = payload.access_token || payload.token || payload.data?.access_token || payload.data?.token;
       if (verifyToken) {
         const sanitized = structuredClone(payload);
