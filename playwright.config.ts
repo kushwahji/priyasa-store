@@ -11,7 +11,7 @@ export default defineConfig({
     {
       command: 'node tests/e2e/mock-core.mjs',
       url: 'http://127.0.0.1:8787/api/v1/storefront/products',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
     },
     {
       command: 'npm run dev',
