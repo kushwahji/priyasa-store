@@ -6,102 +6,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import ApiStatusModal from '@/components/ApiStatusModal';
 
-const nav = [
-  ['NEW IN', '/shop?sort=newest'], ['WOMEN', '/shop?category=women'], ['ETHNIC', '/shop?category=ethnic-wear'],
-  ['DRESSES', '/shop?category=dresses'], ['NIGHTWEAR', '/shop?category=nightwear'], ['ACTIVEWEAR', '/shop?category=activewear'],
-  ['LINGERIE', '/shop?category=lingerie'], ['SALE', '/shop?sort=discount'],
-] as const;
-const protectedPrefixes = ['/account', '/orders', '/cart', '/wishlist', '/addresses', '/checkout', '/support', '/returns', '/notifications'];
-
+const nav = [['NEW IN','/shop?sort=newest'],['WOMEN','/shop?category=women'],['ETHNIC','/shop?category=ethnic-wear'],['DRESSES','/shop?category=dresses'],['NIGHTWEAR','/shop?category=nightwear'],['ACTIVEWEAR','/shop?category=activewear'],['LINGERIE','/shop?category=lingerie'],['SALE','/shop?sort=discount']] as const;
+const protectedPrefixes = ['/account','/orders','/cart','/wishlist','/addresses','/checkout','/support','/returns','/notifications'];
 type AnyRecord = Record<string, any>;
 type HeaderConfig = { logoUrl?: string; logoAlt?: string; searchEnabled: boolean; searchPlaceholder: string; trending: string[]; cartEnabled: boolean; cartShowCount: boolean };
-const DEFAULT_HEADER: HeaderConfig = { searchEnabled: true, searchPlaceholder: 'Search products, styles & categories', trending: [], cartEnabled: true, cartShowCount: true };
-
-function BrandLogo({ footer = false, logoUrl, logoAlt }: { footer?: boolean; logoUrl?: string; logoAlt?: string }) {
-  return <Link className={`logo${footer ? ' footerLogo' : ''}`} href="/" aria-label="PRIYASA home">
-    {logoUrl ? <img src={logoUrl} alt={logoAlt || 'PRIYASA'} /> : <img src="/brand/priyasa-logo.svg" alt={logoAlt || 'PRIYASA — Every You, Beautiful'} />}
-  </Link>;
-}
-
-function readHeader(payload: AnyRecord): HeaderConfig {
-  const candidates = [payload?.data?.header, payload?.header, payload?.data?.home?.header];
-  const header = candidates.find((value) => value && typeof value === 'object') || {};
-  const search = header.search || {};
-  const cart = header.cart || {};
-  const logo = header.logo || {};
-  return {
-    logoUrl: typeof logo.image_url === 'string' ? logo.image_url : undefined,
-    logoAlt: typeof logo.alt === 'string' ? logo.alt : undefined,
-    searchEnabled: search.enabled !== false,
-    searchPlaceholder: typeof search.placeholder === 'string' && search.placeholder.trim() ? search.placeholder : DEFAULT_HEADER.searchPlaceholder,
-    trending: Array.isArray(search.trending) ? search.trending.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim())).slice(0, 8) : [],
-    cartEnabled: cart.enabled !== false,
-    cartShowCount: cart.show_count !== false,
-  };
-}
-
-export default function StoreShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const [query, setQuery] = useState('');
-  const [menu, setMenu] = useState(false);
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [header, setHeader] = useState<HeaderConfig>(DEFAULT_HEADER);
-  const protectedRoute = protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  const standaloneRoute = pathname === '/auth/login' || pathname.startsWith('/auth/login/');
-
-  useEffect(() => setMenu(false), [pathname]);
-  useEffect(() => {
-    let active = true;
-    void api<AnyRecord>('/storefront/home').then((payload) => { if (active) setHeader(readHeader(payload)); }).catch(() => undefined);
-    return () => { active = false; };
-  }, []);
-  useEffect(() => {
-    let active = true;
-    if (!protectedRoute) { setSessionChecked(true); return () => { active = false; }; }
-    setSessionChecked(false);
-    fetch('/api/session', { credentials: 'include', cache: 'no-store' })
-      .then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => null) }))
-      .then(({ ok, body }) => {
-        if (!active) return;
-        if (ok && body?.authenticated === true) { setSessionChecked(true); return; }
-        const next = `${window.location.pathname}${window.location.search}`;
-        window.location.replace(`/auth/login?next=${encodeURIComponent(next)}`);
-      })
-      .catch(() => {
-        if (!active) return;
-        const next = `${window.location.pathname}${window.location.search}`;
-        window.location.replace(`/auth/login?next=${encodeURIComponent(next)}`);
-      });
-    return () => { active = false; };
-  }, [protectedRoute, pathname]);
-
-  const searchSuggestions = useMemo(() => header.trending.length ? header.trending : ['Kurtis', 'Kurta Sets', 'Anarkali', 'Festive Wear'], [header.trending]);
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault(); const value = query.trim(); window.location.href = value ? `/search?q=${encodeURIComponent(value)}` : '/search';
-  }
-
-  if (standaloneRoute) return <><ApiStatusModal />{children}</>;
-  if (protectedRoute && !sessionChecked) return <><ApiStatusModal /><main className="accountPage"><section className="authCard"><p className="muted">Checking your PRIYASA session…</p></section></main></>;
-
-  return <>
-    <ApiStatusModal />
-    <div className="announcement">FREE SHIPPING ABOVE ₹999 <i /> COD AVAILABLE <i /> EASY RETURNS <i /> SECURE PAYMENTS</div>
-    <header className="header"><div className="headerInner">
-      <button className="iconButton menuButton" aria-label="Open menu" onClick={() => setMenu(true)}>☰</button><BrandLogo logoUrl={header.logoUrl} logoAlt={header.logoAlt} />
-      <nav className="desktopNav" aria-label="Primary navigation">{nav.map(([label, href]) => <Link className={pathname === href ? 'active' : ''} key={label} href={href}>{label}</Link>)}</nav>
-      {header.searchEnabled && <form className="headerSearch" onSubmit={submitSearch} role="search"><span>⌕</span><input list="priyasa-trending" value={query} onChange={e => setQuery(e.target.value)} placeholder={header.searchPlaceholder} aria-label="Search products" /><datalist id="priyasa-trending">{searchSuggestions.map((item) => <option key={item} value={item} />)}</datalist></form>}
-      <div className="headerActions"><Link href="/account"><b>♙</b><small>Profile</small></Link><Link href="/wishlist"><b>♡</b><small>Wishlist</small></Link>{header.cartEnabled && <Link href="/cart"><b>♧</b><small>{header.cartShowCount ? 'Bag' : 'Cart'}</small></Link>}</div>
-    </div></header>
-    {menu && <div className="mobileMenuBackdrop" onClick={() => setMenu(false)}><aside className="mobileMenu" onClick={e => e.stopPropagation()}><div className="mobileMenuHead"><BrandLogo logoUrl={header.logoUrl} logoAlt={header.logoAlt} /><button onClick={() => setMenu(false)} aria-label="Close menu">×</button></div>{header.searchEnabled && <form onSubmit={submitSearch}><input list="priyasa-mobile-trending" value={query} onChange={e => setQuery(e.target.value)} placeholder={header.searchPlaceholder} /><datalist id="priyasa-mobile-trending">{searchSuggestions.map((item) => <option key={item} value={item} />)}</datalist><button>Search</button></form>}{nav.map(([label, href]) => <Link key={label} href={href}>{label}<span>›</span></Link>)}<Link href="/account">My Account<span>›</span></Link><Link href="/orders">My Orders<span>›</span></Link><Link href="/returns">Returns & refunds<span>›</span></Link></aside></div>}
-    <main>{children}</main>
-    <footer className="footer">
-      <div className="footerBrand"><BrandLogo footer logoUrl={header.logoUrl} logoAlt={header.logoAlt} /><p>Style · Beauty · Lifestyle · More<br />Your everyday shopping destination.</p></div>
-      <div><strong>SHOP</strong><Link href="/shop">All products</Link><Link href="/shop?sort=newest">New arrivals</Link><Link href="/shop?sort=discount">Sale</Link></div>
-      <div><strong>HELP</strong><Link href="/account">Account</Link><Link href="/orders">Orders</Link><Link href="/support">Support</Link><Link href="/notifications">Notifications</Link></div>
-      <div><strong>POLICIES</strong><Link href="/shipping">Shipping</Link><Link href="/returns">Returns</Link><Link href="/privacy">Privacy</Link></div>
-      <div className="footerApp"><strong>DOWNLOAD OUR APP</strong><p>Get the best PRIYASA shopping experience on mobile.</p><div className="appBadges"><a className="appBadge" href="https://playstore-com.priyasa.com" target="_blank" rel="noopener noreferrer" aria-label="Get PRIYASA on Google Play"><span className="appBadgeIcon">▶</span><span><small>GET IT ON</small><b>Google Play</b></span></a><a className="appBadge" href="https://apps.apple.com/" target="_blank" rel="noopener noreferrer" aria-label="Download PRIYASA on the App Store"><span className="appBadgeIcon">●</span><span><small>Download on the</small><b>App Store</b></span></a></div></div>
-      <div className="footerBottom">© {new Date().getFullYear()} PRIYASA. All rights reserved.<span>Made with ♥ in India</span></div>
-    </footer>
-    <nav className="bottomNav" aria-label="Mobile navigation"><Link href="/" className={pathname === '/' ? 'active' : ''}><b>⌂</b><span>Home</span></Link><Link href="/search"><b>⌕</b><span>Search</span></Link><Link href="/shop"><b>▦</b><span>Shop</span></Link><Link href="/wishlist"><b>♡</b><span>Wishlist</span></Link>{header.cartEnabled && <Link href="/cart"><b>♧</b><span>Bag</span></Link>}</nav>
-  </>;
-}
+const DEFAULT_HEADER: HeaderConfig = { searchEnabled:true, searchPlaceholder:'Search products, styles & categories', trending:[], cartEnabled:true, cartShowCount:true };
+function BrandLogo({footer=false,logoUrl,logoAlt}:{footer?:boolean;logoUrl?:string;logoAlt?:string}){return <Link className={`logo${footer?' footerLogo':''}`} href="/" aria-label="PRIYASA home">{logoUrl?<img src={logoUrl} alt={logoAlt||'PRIYASA'}/>:<img src="/brand/priyasa-logo.svg" alt={logoAlt||'PRIYASA — Every You, Beautiful'}/>}</Link>}
+function readHeader(payload:AnyRecord):HeaderConfig{const candidates=[payload?.data?.header,payload?.header,payload?.data?.home?.header];const header=candidates.find(v=>v&&typeof v==='object')||{};const search=header.search||{};const cart=header.cart||{};const logo=header.logo||{};return {logoUrl:typeof logo.image_url==='string'?logo.image_url:undefined,logoAlt:typeof logo.alt==='string'?logo.alt:undefined,searchEnabled:search.enabled!==false,searchPlaceholder:typeof search.placeholder==='string'&&search.placeholder.trim()?search.placeholder:DEFAULT_HEADER.searchPlaceholder,trending:Array.isArray(search.trending)?search.trending.filter((v:unknown):v is string=>typeof v==='string'&&Boolean(v.trim())).slice(0,8):[],cartEnabled:cart.enabled!==false,cartShowCount:cart.show_count!==false}}
+export default function StoreShell({children}:{children:React.ReactNode}){const pathname=usePathname();const[query,setQuery]=useState('');const[menu,setMenu]=useState(false);const[sessionChecked,setSessionChecked]=useState(false);const[header,setHeader]=useState<HeaderConfig>(DEFAULT_HEADER);const protectedRoute=protectedPrefixes.some(p=>pathname===p||pathname.startsWith(`${p}/`));const standaloneRoute=pathname==='/auth/login'||pathname.startsWith('/auth/login/');useEffect(()=>setMenu(false),[pathname]);useEffect(()=>{let active=true;void api<AnyRecord>('/storefront/home').then(p=>{if(active)setHeader(readHeader(p))}).catch(()=>undefined);return()=>{active=false}},[]);useEffect(()=>{let active=true;if(!protectedRoute){setSessionChecked(true);return()=>{active=false}}setSessionChecked(false);fetch('/api/session',{credentials:'include',cache:'no-store'}).then(async r=>({ok:r.ok,body:await r.json().catch(()=>null)})).then(({ok,body})=>{if(!active)return;if(ok&&body?.authenticated===true){setSessionChecked(true);return}const next=`${window.location.pathname}${window.location.search}`;window.location.replace(`/auth/login?next=${encodeURIComponent(next)}`)}).catch(()=>{if(!active)return;const next=`${window.location.pathname}${window.location.search}`;window.location.replace(`/auth/login?next=${encodeURIComponent(next)}`)});return()=>{active=false}},[protectedRoute,pathname]);const searchSuggestions=useMemo(()=>header.trending.length?header.trending:['Kurtis','Kurta Sets','Anarkali','Festive Wear'],[header.trending]);function submitSearch(e:React.FormEvent){e.preventDefault();const value=query.trim();window.location.href=value?`/search?q=${encodeURIComponent(value)}`:'/search'}if(standaloneRoute)return <><ApiStatusModal/>{children}</>;if(protectedRoute&&!sessionChecked)return <><ApiStatusModal/><main className="accountPage"><section className="authCard"><p className="muted">Checking your PRIYASA session…</p></section></main></>;return <><ApiStatusModal/><div className="announcement">FREE SHIPPING ABOVE ₹999 <i/> COD AVAILABLE <i/> EASY RETURNS <i/> SECURE PAYMENTS</div><header className="header"><div className="headerInner"><button className="iconButton menuButton" aria-label="Open menu" onClick={()=>setMenu(true)}>☰</button><BrandLogo logoUrl={header.logoUrl} logoAlt={header.logoAlt}/><nav className="desktopNav" aria-label="Primary navigation">{nav.map(([label,href])=><Link className={pathname===href?'active':''} key={label} href={href}>{label}</Link>)}</nav>{header.searchEnabled&&<form className="headerSearch" onSubmit={submitSearch} role="search"><span>⌕</span><input list="priyasa-trending" value={query} onChange={e=>setQuery(e.target.value)} placeholder={header.searchPlaceholder} aria-label="Search products"/><datalist id="priyasa-trending">{searchSuggestions.map(item=><option key={item} value={item}/>)}</datalist></form>}<div className="headerActions"><Link href="/account"><b>♙</b><small>Profile</small></Link><Link href="/wishlist"><b>♡</b><small>Wishlist</small></Link>{header.cartEnabled&&<Link href="/cart"><b>♧</b><small>{header.cartShowCount?'Bag':'Cart'}</small></Link>}</div></div></header>{menu&&<div className="mobileMenuBackdrop" onClick={()=>setMenu(false)}><aside className="mobileMenu" onClick={e=>e.stopPropagation()}><div className="mobileMenuHead"><BrandLogo logoUrl={header.logoUrl} logoAlt={header.logoAlt}/><button onClick={()=>setMenu(false)} aria-label="Close menu">×</button></div>{header.searchEnabled&&<form onSubmit={submitSearch}><input list="priyasa-mobile-trending" value={query} onChange={e=>setQuery(e.target.value)} placeholder={header.searchPlaceholder}/><datalist id="priyasa-mobile-trending">{searchSuggestions.map(item=><option key={item} value={item}/>)}</datalist><button>Search</button></form>}{nav.map(([label,href])=><Link key={label} href={href}>{label}<span>›</span></Link>)}<Link href="/account">My Account<span>›</span></Link><Link href="/orders">My Orders<span>›</span></Link><Link href="/returns">Returns & refunds<span>›</span></Link></aside></div>}<main>{children}</main><footer className="footer"><div className="footerBrand"><BrandLogo footer logoUrl={header.logoUrl} logoAlt={header.logoAlt}/><p>Style · Beauty · Lifestyle · More<br/>Your everyday shopping destination.</p></div><div><strong>SHOP</strong><Link href="/shop">All products</Link><Link href="/shop?sort=newest">New arrivals</Link><Link href="/shop?sort=discount">Sale</Link></div><div><strong>HELP</strong><Link href="/account">Account</Link><Link href="/orders">Orders</Link><Link href="/returns">Returns & refunds</Link><Link href="/faq">FAQs</Link><Link href="/contact">Contact us</Link></div><div><strong>ABOUT & POLICIES</strong><Link href="/about">About PRIYASA</Link><Link href="/shipping">Shipping & delivery</Link><Link href="/return-policy">Return & refund policy</Link><Link href="/terms">Terms & conditions</Link><Link href="/privacy">Privacy policy</Link></div><div className="footerApp"><strong>DOWNLOAD OUR APP</strong><p>Get the best PRIYASA shopping experience on mobile.</p><div className="appBadges"><a className="appBadge" href="https://playstore-com.priyasa.com" target="_blank" rel="noopener noreferrer" aria-label="Get PRIYASA on Google Play"><span className="appBadgeIcon">▶</span><span><small>GET IT ON</small><b>Google Play</b></span></a><a className="appBadge" href="https://apps.apple.com/" target="_blank" rel="noopener noreferrer" aria-label="Download PRIYASA on the App Store"><span className="appBadgeIcon">●</span><span><small>Download on the</small><b>App Store</b></span></a></div></div><div className="footerBottom">© {new Date().getFullYear()} PRIYASA. All rights reserved.<span>Made with ♥ in India</span></div></footer><nav className="bottomNav" aria-label="Mobile navigation"><Link href="/" className={pathname==='/'?'active':''}><b>⌂</b><span>Home</span></Link><Link href="/search"><b>⌕</b><span>Search</span></Link><Link href="/shop"><b>▦</b><span>Shop</span></Link><Link href="/wishlist"><b>♡</b><span>Wishlist</span></Link>{header.cartEnabled&&<Link href="/cart"><b>♧</b><span>Bag</span></Link>}</nav></>}
