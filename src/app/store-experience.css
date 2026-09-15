@@ -1,1 +1,257 @@
-.contentPage{max-width:1180px;margin:auto;padding:48px 24px 80px}.contentHero{padding:34px 0 40px;border-bottom:1px solid var(--line)}.contentHero h1{font:500 clamp(34px,5vw,54px)/1.05 'Playfair Display',serif;margin:10px 0 12px}.contentHero p{max-width:720px;color:var(--muted);font-size:15px}.contentLayout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:34px}.contentNav{position:sticky;top:105px;align-self:start;border:1px solid var(--line);padding:18px;background:#fff}.contentNav strong{display:block;font-size:11px;letter-spacing:1.4px;margin-bottom:10px}.contentNav a{display:block;padding:8px 0;color:#666975;font-size:11px}.contentNav a:hover{color:var(--pink)}.contentBody{min-width:0}.contentSection{padding:0 0 28px;margin-bottom:28px;border-bottom:1px solid var(--line)}.contentSection h2{font:500 23px 'Playfair Display',serif;margin:0 0 9px}.contentSection p,.contentSection li,.faqAnswer{font-size:13px;color:#565965;line-height:1.8}.contentSection ul,.faqAnswer ul{padding-left:20px}.faqItem{border-bottom:1px solid var(--line)}.faqQuestion{width:100%;display:flex;justify-content:space-between;gap:20px;text-align:left;padding:18px 0;border:0;background:none;font-weight:700;color:var(--ink)}.faqQuestion span{color:var(--pink);font-size:20px}.faqAnswer{padding:0 32px 20px 0}.notificationPrompt{position:fixed;right:20px;bottom:88px;z-index:500;width:min(390px,calc(100vw - 32px));background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 55px rgba(40,44,63,.2);padding:18px}.notificationPromptHead{display:flex;align-items:flex-start;gap:12px}.notificationIcon{width:46px;height:46px;border-radius:11px;background:var(--pink);display:grid;place-items:center;color:#fff;font-size:24px;font-weight:800;flex:0 0 auto}.notificationPrompt h3{margin:0;font-size:16px}.notificationPrompt p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.6}.notificationClose{margin-left:auto;border:0;background:none;font-size:20px;color:#9a9ca5}.notificationActions{display:flex;gap:8px;margin-top:16px}.notificationActions button{flex:1;min-height:40px}.notificationReminder{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}.notificationReminder label{display:flex;gap:8px;align-items:center;font-size:11px;color:#555}.notificationToast{position:fixed;right:20px;top:88px;z-index:700;width:min(360px,calc(100vw - 32px));padding:14px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 40px rgba(40,44,63,.16)}.notificationToast strong{display:block;font-size:12px}.notificationToast span{display:block;margin-top:4px;color:var(--muted);font-size:11px}.@media(max-width:700px){.contentPage{padding:28px 14px 50px}.contentLayout{grid-template-columns:1fr;gap:20px}.contentNav{position:static;display:flex;overflow:auto;gap:15px;padding:10px 12px;white-space:nowrap}.contentNav strong{display:none}.contentNav a{padding:5px 0}.notificationPrompt{left:12px;right:12px;bottom:82px;width:auto}.notificationActions{flex-direction:column}.notificationToast{left:12px;right:12px;top:74px;width:auto}}
+.contentPage {
+  max-width: 1180px;
+  margin: auto;
+  padding: 48px 24px 80px;
+}
+
+.contentHero {
+  padding: 34px 0 40px;
+  border-bottom: 1px solid var(--line);
+}
+
+.contentHero h1 {
+  font: 500 clamp(34px, 5vw, 54px) / 1.05 'Playfair Display', serif;
+  margin: 10px 0 12px;
+}
+
+.contentHero p {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.contentLayout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 48px;
+  padding-top: 34px;
+}
+
+.contentNav {
+  position: sticky;
+  top: 105px;
+  align-self: start;
+  border: 1px solid var(--line);
+  padding: 18px;
+  background: #fff;
+}
+
+.contentNav strong {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  margin-bottom: 10px;
+}
+
+.contentNav a {
+  display: block;
+  padding: 8px 0;
+  color: #666975;
+  font-size: 11px;
+}
+
+.contentNav a:hover {
+  color: var(--pink);
+}
+
+.contentBody {
+  min-width: 0;
+}
+
+.contentSection {
+  padding: 0 0 28px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.contentSection h2 {
+  font: 500 23px 'Playfair Display', serif;
+  margin: 0 0 9px;
+}
+
+.contentSection p,
+.contentSection li,
+.faqAnswer {
+  font-size: 13px;
+  color: #565965;
+  line-height: 1.8;
+}
+
+.contentSection ul,
+.faqAnswer ul {
+  padding-left: 20px;
+}
+
+.faqItem {
+  border-bottom: 1px solid var(--line);
+}
+
+.faqQuestion {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  text-align: left;
+  padding: 18px 0;
+  border: 0;
+  background: none;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.faqQuestion span {
+  color: var(--pink);
+  font-size: 20px;
+}
+
+.faqAnswer {
+  padding: 0 32px 20px 0;
+}
+
+.notificationPrompt {
+  position: fixed;
+  right: 20px;
+  bottom: 88px;
+  z-index: 500;
+  width: min(390px, calc(100vw - 32px));
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 55px rgba(40, 44, 63, 0.2);
+  padding: 18px;
+}
+
+.notificationPromptHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.notificationIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
+  background: var(--pink);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.notificationPrompt h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.notificationPrompt p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.notificationClose {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  font-size: 20px;
+  color: #9a9ca5;
+}
+
+.notificationActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.notificationActions button {
+  flex: 1;
+  min-height: 40px;
+}
+
+.notificationReminder {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.notificationReminder label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #555;
+}
+
+.notificationToast {
+  position: fixed;
+  right: 20px;
+  top: 88px;
+  z-index: 700;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(40, 44, 63, 0.16);
+}
+
+.notificationToast strong {
+  display: block;
+  font-size: 12px;
+}
+
+.notificationToast span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 700px) {
+  .contentPage {
+    padding: 28px 14px 50px;
+  }
+
+  .contentLayout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .contentNav {
+    position: static;
+    display: flex;
+    overflow: auto;
+    gap: 15px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .contentNav strong {
+    display: none;
+  }
+
+  .contentNav a {
+    padding: 5px 0;
+  }
+
+  .notificationPrompt {
+    left: 12px;
+    right: 12px;
+    bottom: 82px;
+    width: auto;
+  }
+
+  .notificationActions {
+    flex-direction: column;
+  }
+
+  .notificationToast {
+    left: 12px;
+    right: 12px;
+    top: 74px;
+    width: auto;
+  }
+}
