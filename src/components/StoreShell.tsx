@@ -33,7 +33,7 @@ function readHeader(payload: AnyRecord): HeaderConfig {
     logoAlt: typeof logo.alt === 'string' ? logo.alt : undefined,
     searchEnabled: search.enabled !== false,
     searchPlaceholder: typeof search.placeholder === 'string' && search.placeholder.trim() ? search.placeholder : DEFAULT_HEADER.searchPlaceholder,
-    trending: Array.isArray(search.trending) ? search.trending.filter((value: unknown): value is string => typeof value === 'string' && value.trim()).slice(0, 8) : [],
+    trending: Array.isArray(search.trending) ? search.trending.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim())).slice(0, 8) : [],
     cartEnabled: cart.enabled !== false,
     cartShowCount: cart.show_count !== false,
   };
