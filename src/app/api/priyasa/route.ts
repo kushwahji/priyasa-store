@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || 'https://api.priyasa.com/api/v1').replace(/\/$/, '');
+function upstreamBase() {
+  const configured = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_URL || 'https://api.priyasa.com/api/v1').replace(/\/+$/, '');
+  return /\/api\/v\d+$/i.test(configured) ? configured : `${configured}/api/v1`;
+}
 const SESSION_COOKIE = 'priyasa_access_token';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -50,7 +53,7 @@ async function proxy(request: NextRequest) {
   const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
   upstreamParams.delete('_path');
   const query = upstreamParams.toString();
-  const upstreamUrl = `${UPSTREAM}${endpoint}${query ? `?${query}` : ''}`;
+  const upstreamUrl = `${upstreamBase()}${endpoint}${query ? `?${query}` : ''}`;
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const correlationId = requestId(request);
   const headers = new Headers({ Accept: 'application/json', 'X-Correlation-ID': correlationId });
@@ -72,10 +75,8 @@ async function proxy(request: NextRequest) {
     return NextResponse.json({ message: 'Unable to reach PriyasaCore API.', error_code: 'PRIYASA_API_DOWN', correlation_id: correlationId }, { status: 502, headers: { 'X-Correlation-ID': correlationId, 'Cache-Control': 'no-store' } });
   }
 
-  // Read as text so the Next.js/Node runtime does not have to reconcile ArrayBufferLike with BodyInit.
   let body = await upstream.text();
   let verifyToken: string | undefined;
-
   if (endpoint === '/auth/verify-otp' && upstream.ok) {
     try {
       const payload = JSON.parse(body);
@@ -101,6 +102,5 @@ async function proxy(request: NextRequest) {
 
   if (upstream.status === 401 || endpoint === '/auth/logout') response.cookies.set(sessionCookie('', 0));
   if (endpoint === '/auth/verify-otp' && upstream.ok && verifyToken) response.cookies.set(sessionCookie(verifyToken, SESSION_MAX_AGE));
-
   return response;
 }
