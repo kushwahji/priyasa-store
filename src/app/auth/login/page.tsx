@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { api, clearAccessToken } from '@/lib/api';
+import { api, clearAccessToken, setAccessToken } from '@/lib/api';
 import styles from './page.module.css';
 
-type OtpResponse = { request_id?: string; data?: { request_id?: string }; session?: boolean };
+type OtpResponse = { request_id?: string; data?: { request_id?: string; success?: boolean }; success?: boolean; message?: string };
 
 function safeNext() {
   const value = new URLSearchParams(window.location.search).get('next');
@@ -25,7 +25,7 @@ export default function Login() {
     if (!/^[6-9]\d{9}$/.test(phone)) { setError('Enter a valid 10-digit mobile number.'); return; }
     setBusy(true);
     try {
-      const r = await api<OtpResponse>('/auth/send-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, device_token: 'web-store', device_id: 'web-store', channel: 'auto' }) });
+      const r = await api<OtpResponse>('/auth/send-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, device_token: 'web-store', device_id: 'web-store', channel: 'auto', platform: 'web' }) });
       const id = r.request_id || r.data?.request_id;
       if (!id) throw new Error('OTP request was accepted but no request ID was returned.');
       setRequestId(id); setSent(true); setMessage('OTP sent. It is valid for a limited time.');
@@ -51,7 +51,12 @@ export default function Login() {
     if (!/^\d{6}$/.test(otp)) { setError('Enter the 6-digit OTP.'); return; }
     setBusy(true);
     try {
-      await api<OtpResponse>('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, otp, request_id: requestId }) });
+      const r = await api<OtpResponse>('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ mobile: phone, otp, request_id: requestId, device_token: 'web-store', device_id: 'web-store', platform: 'web' }) });
+      if (r.success === false || r.data?.success === false) throw new Error(r.message || 'OTP verification failed.');
+
+      // The bearer credential is intentionally kept in the BFF's HttpOnly cookie.
+      // This marker only tells client-side guards that a verified session exists.
+      setAccessToken('bff-session');
       window.location.assign(safeNext());
     } catch (e) { clearAccessToken(); setError(e instanceof Error ? e.message : 'Unable to complete sign in. Please try again.'); }
     finally { setBusy(false); }
