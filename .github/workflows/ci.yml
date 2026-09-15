@@ -9,11 +9,11 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       PRIYASA_API_BASE_URL: http://127.0.0.1:8787/api/v1
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
-      PRIYASA_E2E_ENABLED: false
+      PRIYASA_E2E_ENABLED: true
       CI: true
     steps:
       - uses: actions/checkout@v4
@@ -34,10 +34,30 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install Playwright browser
-        if: ${{ env.PRIYASA_E2E_ENABLED == 'true' }}
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Start deterministic PriyasaCore mock
+        run: |
+          node tests/e2e/mock-core.mjs > /tmp/priyasa-mock-core.log 2>&1 &
+          echo $! > /tmp/priyasa-mock-core.pid
+          for i in {1..20}; do
+            curl --fail --silent http://127.0.0.1:8787/api/v1/storefront/home >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/priyasa-mock-core.log
+          exit 1
+
       - name: End-to-end tests
-        if: ${{ env.PRIYASA_E2E_ENABLED == 'true' }}
         run: npm run test:e2e
+
+      - name: Upload E2E artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: priyasa-store-e2e-artifacts
+          path: |
+            test-results/
+            playwright-report/
+            /tmp/priyasa-mock-core.log
+          if-no-files-found: ignore
