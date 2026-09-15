@@ -1,3 +1,3 @@
-import type { Metadata } from 'next';
-export const metadata: Metadata = { title: 'Privacy | PRIYASA' };
-export default function PrivacyPage() { return <main className="accountPage"><span className="eyebrow">PRIYASA POLICY</span><h1>Privacy</h1><div className="policyCopy"><p>PRIYASA uses the information required to authenticate customers, process orders, deliver purchases and provide support through PriyasaCore.</p><p>Payment credentials are handled by the configured payment provider. The Store browser does not receive the private PriyasaCore API configuration or the server-side session token.</p><p>For account or data questions, contact PRIYASA support.</p></div></main>; }
+import ContentPage from '@/components/ContentPage';
+export const dynamic = 'force-dynamic';
+export default function Page() { return <ContentPage pageKey="privacy" />; }
