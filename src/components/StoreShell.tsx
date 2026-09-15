@@ -21,6 +21,7 @@ export default function StoreShell({ children }: { children: React.ReactNode }) 
   const [menu, setMenu] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const protectedRoute = protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  const standaloneRoute = pathname === '/auth/login' || pathname.startsWith('/auth/login/');
 
   useEffect(() => setMenu(false), [pathname]);
   useEffect(() => {
@@ -46,6 +47,8 @@ export default function StoreShell({ children }: { children: React.ReactNode }) 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault(); const value = query.trim(); window.location.href = value ? `/search?q=${encodeURIComponent(value)}` : '/search';
   }
+
+  if (standaloneRoute) return <>{children}</>;
   if (protectedRoute && !sessionChecked) return <main className="accountPage"><section className="authCard"><p className="muted">Checking your PRIYASA session…</p></section></main>;
 
   return <>
