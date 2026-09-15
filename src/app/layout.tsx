@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import './responsive-overrides.css';
 import './home-dynamic.css';
+import './festival.css';
 import StoreShell from '@/components/StoreShell';
 
 const siteUrl = (process.env.NEXT_PUBLIC_STORE_URL || 'http://localhost:3000').replace(/\/$/, '');
