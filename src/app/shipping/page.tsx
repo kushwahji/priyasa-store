@@ -1,3 +1,3 @@
-import type { Metadata } from 'next';
-export const metadata: Metadata = { title: 'Shipping | PRIYASA' };
-export default function ShippingPage() { return <main className="accountPage"><span className="eyebrow">PRIYASA POLICY</span><h1>Shipping</h1><div className="policyCopy"><p>Shipping availability, charges and delivery estimates are calculated by PriyasaCore for the order and destination.</p><p>Free shipping applies above ₹999 where the active commerce configuration permits it. Cash on delivery availability is also determined by the current order and delivery rules.</p><p>For an order-specific delivery status, use My Orders after signing in.</p></div></main>; }
+import ContentPage from '@/components/ContentPage';
+export const dynamic = 'force-dynamic';
+export default function Page() { return <ContentPage pageKey="shipping" />; }
