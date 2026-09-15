@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import ApiStatusModal from '@/components/ApiStatusModal';
 
 const nav = [
   ['NEW IN', '/shop?sort=newest'], ['WOMEN', '/shop?category=women'], ['ETHNIC', '/shop?category=ethnic-wear'],
@@ -79,10 +80,11 @@ export default function StoreShell({ children }: { children: React.ReactNode }) 
     e.preventDefault(); const value = query.trim(); window.location.href = value ? `/search?q=${encodeURIComponent(value)}` : '/search';
   }
 
-  if (standaloneRoute) return <>{children}</>;
-  if (protectedRoute && !sessionChecked) return <main className="accountPage"><section className="authCard"><p className="muted">Checking your PRIYASA session…</p></section></main>;
+  if (standaloneRoute) return <><ApiStatusModal />{children}</>;
+  if (protectedRoute && !sessionChecked) return <><ApiStatusModal /><main className="accountPage"><section className="authCard"><p className="muted">Checking your PRIYASA session…</p></section></main></>;
 
   return <>
+    <ApiStatusModal />
     <div className="announcement">FREE SHIPPING ABOVE ₹999 <i /> COD AVAILABLE <i /> EASY RETURNS <i /> SECURE PAYMENTS</div>
     <header className="header"><div className="headerInner">
       <button className="iconButton menuButton" aria-label="Open menu" onClick={() => setMenu(true)}>☰</button><BrandLogo logoUrl={header.logoUrl} logoAlt={header.logoAlt} />
