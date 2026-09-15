@@ -4,7 +4,9 @@ import './responsive-overrides.css';
 import './home-dynamic.css';
 import './festival.css';
 import './festival-fixes.css';
+import './store-experience.css';
 import StoreShell from '@/components/StoreShell';
+import NotificationPrompt from '@/components/NotificationPrompt';
 
 const siteUrl = (process.env.NEXT_PUBLIC_STORE_URL || 'http://localhost:3000').replace(/\/$/, '');
 
@@ -22,5 +24,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><StoreShell>{children}</StoreShell></body></html>;
+  return <html lang="en"><body><StoreShell><NotificationPrompt />{children}</StoreShell></body></html>;
 }
