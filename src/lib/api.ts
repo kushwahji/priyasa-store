@@ -21,7 +21,6 @@ function idempotencyKey(){
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
-// Browser code never reads or stores the bearer token. The BFF owns the HttpOnly session cookie.
 export function getAccessToken(){return typeof window!=='undefined'&&localStorage.getItem(SESSION_MARKER)==='1'?'session':null}
 export function setAccessToken(token:string){if(typeof window!=='undefined'&&token)localStorage.setItem(SESSION_MARKER,'1')}
 export function clearAccessToken(){if(typeof window!=='undefined')localStorage.removeItem(SESSION_MARKER)}
@@ -32,6 +31,10 @@ function redirectToLogin(){
   if(path.startsWith('/auth/login'))return;
   const next=`${path}${window.location.search}`;
   window.location.assign(`/auth/login?next=${encodeURIComponent(next)}`);
+}
+
+function notifyApiError(status:number,message:string){
+  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('priyasa-api-error',{detail:{status,message}}));
 }
 
 export async function api<T>(path:string,init:RequestInit={}){
@@ -45,14 +48,17 @@ export async function api<T>(path:string,init:RequestInit={}){
   try{
     res=await fetch(buildUrl(path),{...init,headers,cache:'no-store',credentials:'include'});
   }catch(e){
-    throw new Error(e instanceof Error&&e.message?`Unable to reach PriyasaCore: ${e.message}`:'Unable to reach PriyasaCore. Check the Store API connection.');
+    const message=e instanceof Error&&e.message?`Unable to reach PriyasaCore: ${e.message}`:'Unable to reach PriyasaCore. Check the Store API connection.';
+    notifyApiError(0,message);
+    throw new Error(message);
   }
 
-  if(res.status===401){
-    clearAccessToken();
-    redirectToLogin();
-  }
+  if(res.status===401){clearAccessToken();redirectToLogin();}
   const body=await res.json().catch(()=>null);
-  if(!res.ok)throw new Error(body?.message||body?.error||`PRIYASA_API_${res.status}`);
+  if(!res.ok){
+    const message=body?.message||body?.error||`PRIYASA_API_${res.status}`;
+    if(res.status===404||res.status>=500)notifyApiError(res.status,message);
+    throw new Error(message);
+  }
   return body as T;
 }
