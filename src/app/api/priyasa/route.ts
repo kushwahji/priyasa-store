@@ -4,6 +4,7 @@ const UPSTREAM = (process.env.PRIYASA_API_BASE_URL || process.env.PRIYASA_API_UR
 const SESSION_COOKIE = 'priyasa_access_token';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const MAX_BODY_BYTES = 1024 * 1024;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,17 +29,24 @@ function sameOrigin(request: NextRequest) {
   try { return new URL(origin).origin === request.nextUrl.origin; } catch { return false; }
 }
 
+function allowedEndpoint(endpoint: string) {
+  return endpoint.startsWith('/auth/') || endpoint.startsWith('/storefront/');
+}
+
 async function proxy(request: NextRequest) {
   const endpoint = request.nextUrl.searchParams.get('_path');
   const method = request.method.toUpperCase();
 
-  // This is a same-origin transport, not a general-purpose URL proxy.
-  if (!endpoint || !endpoint.startsWith('/') || endpoint.startsWith('//') || endpoint.includes('\\') || endpoint.includes('/../') || endpoint === '/..') {
-    return NextResponse.json({ message: 'Invalid PriyasaCore API path.' }, { status: 400 });
+  // This is a same-origin transport, never a general-purpose URL proxy.
+  if (!endpoint || !endpoint.startsWith('/') || endpoint.startsWith('//') || endpoint.includes('\\') || endpoint.includes('/../') || endpoint === '/..' || !allowedEndpoint(endpoint)) {
+    return NextResponse.json({ message: 'Unsupported PriyasaCore API path.' }, { status: 400 });
   }
   if (!SAFE_METHODS.has(method) && !sameOrigin(request)) {
     return NextResponse.json({ message: 'Cross-origin mutation rejected.' }, { status: 403 });
   }
+
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > MAX_BODY_BYTES) return NextResponse.json({ message: 'Request body is too large.' }, { status: 413 });
 
   const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
   upstreamParams.delete('_path');
