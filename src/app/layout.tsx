@@ -5,6 +5,7 @@ import './home-dynamic.css';
 import './festival.css';
 import './festival-fixes.css';
 import './store-experience.css';
+import './content-responsive.css';
 import StoreShell from '@/components/StoreShell';
 import NotificationPrompt from '@/components/NotificationPrompt';
 
