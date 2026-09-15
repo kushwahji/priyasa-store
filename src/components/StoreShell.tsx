@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { StorefrontHome, StoreNavItem } from '@/lib/storefront';
+import ServiceDownModal from '@/components/ServiceDownModal';
 
 const fallbackNav: StoreNavItem[] = [
   {label:'NEW IN',href:'/shop?sort=newest'}, {label:'WOMEN',href:'/shop?category=women'}, {label:'ETHNIC',href:'/shop?category=ethnic-wear'},
@@ -14,7 +15,7 @@ const fallbackNav: StoreNavItem[] = [
 export default function StoreShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [query,setQuery]=useState(''); const [menu,setMenu]=useState(false); const [config,setConfig]=useState<StorefrontHome|null>(null);
-  useEffect(()=>{let dead=false;fetch('/api/storefront/home').then(r=>r.ok?r.json():null).then(r=>{if(!dead&&r?.success)setConfig(r.data)}).catch(()=>undefined);return()=>{dead=true}},[]);
+  useEffect(()=>{let dead=false;fetch('/api/storefront/home').then(async r=>{if(!r.ok){if([404,502,503,504].includes(r.status))window.dispatchEvent(new CustomEvent('priyasa:service-down',{detail:{code:r.status===404?'PRIYASA_API_404':'PRIYASA_API_DOWN',status:r.status}}));return null}return r.json()}).then(r=>{if(!dead&&r?.success)setConfig(r.data)}).catch(()=>{if(!dead)window.dispatchEvent(new CustomEvent('priyasa:service-down',{detail:{code:'PRIYASA_API_DOWN'}}))});return()=>{dead=true}},[]);
   useEffect(()=>setMenu(false),[pathname]);
   const nav=config?.navigation?.items?.length?config.navigation.items:fallbackNav;
   const mobileNav=config?.navigation?.mobile_items?.length?config.navigation.mobile_items:nav.slice(0,5);
@@ -22,6 +23,7 @@ export default function StoreShell({ children }: { children: React.ReactNode }) 
   const announcement=config?.announcement;
   function submitSearch(e:React.FormEvent){e.preventDefault();const v=query.trim();window.location.href=v?`/search?q=${encodeURIComponent(v)}`:'/search';}
   return <>
+    <ServiceDownModal />
     {announcement?.enabled!==false&&<div className="announcement">{(announcement?.items?.length?announcement.items:[{text:'FREE SHIPPING ABOVE ₹999'},{text:'COD AVAILABLE'},{text:'EASY RETURNS'},{text:'SECURE PAYMENTS'}]).map((x,i)=><span key={String(x.id||i)}>{x.href?<Link href={x.href}>{x.text}</Link>:x.text}{i<(announcement?.items?.length?announcement.items.length:4)-1&&<i/>}</span>)}</div>}
     <header className="header"><div className="headerInner">
       <button className="iconButton menuButton" aria-label="Open menu" onClick={()=>setMenu(true)}>☰</button>
