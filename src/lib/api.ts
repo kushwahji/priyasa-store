@@ -2,7 +2,13 @@ const SERVER_BASE=(process.env.PRIYASA_API_BASE_URL||process.env.PRIYASA_API_URL
 const BROWSER_BASE='/api/priyasa';
 const SESSION_MARKER='priyasa_session_active';
 
-function base(){return typeof window==='undefined'?SERVER_BASE:BROWSER_BASE}
+function buildUrl(path:string){
+  if(typeof window==='undefined')return `${SERVER_BASE}${path}`;
+  const [pathname,query='']=path.split('?');
+  const params=new URLSearchParams(query);
+  params.set('_path',pathname.startsWith('/')?pathname:`/${pathname}`);
+  return `${BROWSER_BASE}?${params.toString()}`;
+}
 
 function idempotencyKey(){
   try{
@@ -37,7 +43,7 @@ export async function api<T>(path:string,init:RequestInit={}){
 
   let res:Response;
   try{
-    res=await fetch(`${base()}${path}`,{...init,headers,cache:'no-store',credentials:'include'});
+    res=await fetch(buildUrl(path),{...init,headers,cache:'no-store',credentials:'include'});
   }catch(e){
     throw new Error(e instanceof Error&&e.message?`Unable to reach PriyasaCore: ${e.message}`:'Unable to reach PriyasaCore. Check the Store API connection.');
   }
