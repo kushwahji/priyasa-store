@@ -106,13 +106,13 @@ export async function ALL(request: NextRequest, context: { params: Promise<{ pat
   }
 
   const isVerify = route === 'auth/verify-otp' && upstream.ok && contentType.includes('application/json');
-  let responseBody = rawBody;
+  let responseBody: BodyInit = rawBody;
   let token: string | null = null;
   if (isVerify) {
     try {
       const payload = JSON.parse(new TextDecoder().decode(rawBody));
       token = extractToken(payload);
-      responseBody = new TextEncoder().encode(JSON.stringify(stripToken(payload))).buffer;
+      responseBody = JSON.stringify(stripToken(payload));
     } catch {}
   }
 
