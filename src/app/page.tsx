@@ -1,5 +1,6 @@
+import FestivalTheme from '@/components/FestivalTheme';
 import HomeExperience from '@/components/HomeExperience';
 
 export default function Home() {
-  return <HomeExperience />;
+  return <FestivalTheme><HomeExperience /></FestivalTheme>;
 }
