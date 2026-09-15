@@ -14,11 +14,26 @@
 @media (min-width:701px){.authHandle{display:none}.authBackdrop{display:none}}
 
 /* Canonical PRIYASA brand asset. The same SVG is used in desktop, mobile and footer chrome. */
-.logo{display:inline-flex;align-items:center;flex:0 0 auto}
+.logo{display:inline-flex;align-items:center;flex:0 0 auto;line-height:0}
 .logo img{display:block;width:154px;height:auto;max-height:40px;object-fit:contain}
-.footerLogo img{width:170px;max-height:42px}
+.footerLogo img{width:170px;max-height:44px}
 .mobileMenuHead .logo img{width:142px;max-height:36px}
-@media (max-width:700px){.logo img{width:126px;max-height:32px}.mobileMenuHead .logo img{width:138px}.footerLogo img{width:150px}}
+.footerBrand .logo img{width:190px;max-height:48px}
+@media (max-width:700px){.logo img{width:126px;max-height:32px}.mobileMenuHead .logo img{width:138px}.footerLogo img,.footerBrand .logo img{width:156px;max-height:40px}}
+
+/* Footer app links: compact store badges that remain usable on narrow screens. */
+.footerApp{min-width:0}
+.footerApp p{margin:0 0 12px;max-width:320px}
+.appBadges{display:flex;gap:8px;flex-wrap:wrap}
+.appBadge{display:inline-flex!important;align-items:center;gap:8px!important;margin:0!important;padding:7px 11px!important;border:1px solid #d7d8de;border-radius:8px;background:#111;color:#fff!important;min-width:142px;line-height:1.05}
+.appBadge:hover{border-color:#fff;transform:translateY(-1px)}
+.appBadgeIcon{display:grid;place-items:center;width:23px;height:23px;font-size:15px;color:#fff}
+.appBadge small{display:block!important;color:#fff!important;font-size:7px!important;line-height:1.1!important;margin:0!important;letter-spacing:.2px}
+.appBadge b{display:block!important;color:#fff!important;font-size:12px!important;line-height:1.15!important;font-weight:700}
+.footerBottom{display:flex;justify-content:space-between;gap:20px;align-items:center}
+.footerBottom span{margin-left:auto}
+@media(max-width:900px){.footer{grid-template-columns:1.5fr repeat(2,1fr)}.footerApp{grid-column:1/-1}.footerBrand .logo img{width:170px}}
+@media(max-width:700px){.footer{grid-template-columns:1fr 1fr;padding:34px 18px 24px;gap:25px 18px}.footerBrand,.footerApp{grid-column:1/-1}.footerBrand .logo img{width:156px}.appBadges{display:grid;grid-template-columns:1fr 1fr}.appBadge{min-width:0;width:100%;padding:7px 8px!important}.appBadge b{font-size:10px!important}.footerBottom{display:block;line-height:1.8}.footerBottom span{display:block;margin-left:0}}
 
 /* Auth polish: stable card geometry, keyboard-safe controls and readable error states. */
 .authCard{min-height:0}.authCard form{width:100%}.authCard button:disabled{opacity:.55;cursor:not-allowed}.authCard .formError{word-break:break-word}.authCard .formMessage{word-break:break-word}
