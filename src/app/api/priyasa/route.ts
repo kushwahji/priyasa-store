@@ -37,7 +37,6 @@ async function proxy(request: NextRequest) {
   const endpoint = request.nextUrl.searchParams.get('_path');
   const method = request.method.toUpperCase();
 
-  // This is a same-origin transport, never a general-purpose URL proxy.
   if (!endpoint || !endpoint.startsWith('/') || endpoint.startsWith('//') || endpoint.includes('\\') || endpoint.includes('/../') || endpoint === '/..' || !allowedEndpoint(endpoint)) {
     return NextResponse.json({ message: 'Unsupported PriyasaCore API path.' }, { status: 400 });
   }
@@ -73,14 +72,12 @@ async function proxy(request: NextRequest) {
     return NextResponse.json({ message: 'Unable to reach PriyasaCore API.', correlation_id: correlationId }, { status: 502, headers: { 'X-Correlation-ID': correlationId } });
   }
 
-  let body = await upstream.arrayBuffer();
+  let body: BodyInit = await upstream.arrayBuffer();
   let verifyToken: string | undefined;
 
-  // Keep Core's bearer credential entirely server-side. Browser JavaScript gets
-  // only the sanitized verification response; the BFF owns the HttpOnly cookie.
   if (endpoint === '/auth/verify-otp' && upstream.ok) {
     try {
-      const payload = JSON.parse(new TextDecoder().decode(body));
+      const payload = JSON.parse(new TextDecoder().decode(body as ArrayBuffer));
       verifyToken = payload.access_token || payload.token || payload.data?.access_token || payload.data?.token;
       if (verifyToken) {
         const sanitized = structuredClone(payload);
@@ -90,7 +87,7 @@ async function proxy(request: NextRequest) {
           delete sanitized.data.access_token;
           delete sanitized.data.token;
         }
-        body = new TextEncoder().encode(JSON.stringify(sanitized)).buffer;
+        body = JSON.stringify(sanitized);
       }
     } catch { /* Preserve non-JSON upstream responses. */ }
   }
