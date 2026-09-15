@@ -1,6 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 104" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" role="img" aria-labelledby="title desc">
   <title id="title">PRIYASA</title>
-  <desc id="desc">PRIYASA wordmark with the tagline Every You, Beautiful</desc>
-  <text x="260" y="54" text-anchor="middle" fill="#ff3f6c" font-family="Georgia, 'Times New Roman', serif" font-size="48" font-weight="600" letter-spacing="7">PRIYASA</text>
-  <text x="260" y="82" text-anchor="middle" fill="#777b87" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700" letter-spacing="4">EVERY YOU, BEAUTIFUL</text>
+  <desc id="desc">PRIYASA red logo and wordmark</desc>
+  <defs>
+    <linearGradient id="p" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff304f"/>
+      <stop offset="1" stop-color="#ed174b"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="174" height="174" rx="34" fill="url(#p)"/>
+  <path fill="#fff" d="M52 39h61c36 0 62 22 62 55 0 31-24 54-57 54H91v28H52V39zm39 34v42h25c13 0 22-8 22-21 0-13-9-21-22-21H91z"/>
+  <path fill="#fff" d="M91 126c-24 10-38 24-39 43 18-17 36-23 55-28l13-4-29-11z"/>
+  <path fill="#fff" d="M118 89c0-10 7-18 17-18s18 8 18 18-8 18-18 18-17-8-17-18z"/>
+  <text x="210" y="124" fill="#ed174b" font-family="Arial,Helvetica,sans-serif" font-size="91" font-weight="800" letter-spacing="2">PRIYASA</text>
 </svg>
