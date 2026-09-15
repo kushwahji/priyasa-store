@@ -1,0 +1,130 @@
+'use client';
+
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+
+function unwrap(r: any) { return r?.data?.order ?? r?.data ?? r?.order ?? r ?? {}; }
+function money(v: any) { return `₹${Number(v || 0).toLocaleString('en-IN')}`; }
+function label(v: any) { return String(v || 'processing').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function timelineOf(r: any): any[] { const v = r?.data ?? r ?? {}; return Array.isArray(v) ? v : v.timeline ?? v.events ?? v.activities ?? []; }
+
+export default function OrderDetail() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id || '';
+  const [order, setOrder] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [reorderBusy, setReorderBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true); setError('');
+    try {
+      const [orderResponse, timelineResponse] = await Promise.all([
+        api<any>(`/storefront/orders/${encodeURIComponent(id)}`),
+        api<any>(`/orders/${encodeURIComponent(id)}/timeline`).catch(() => null),
+      ]);
+      setOrder(unwrap(orderResponse));
+      setTimeline(timelineResponse ? timelineOf(timelineResponse) : []);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load this order.'); }
+    finally { setLoading(false); }
+  }, [id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function cancelOrder() {
+    if (!window.confirm('Cancel this order? This cannot be undone.')) return;
+    setActionBusy(true); setError(''); setMessage('');
+    try {
+      await api(`/storefront/orders/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({}) });
+      setMessage('Cancellation requested.'); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to cancel this order.'); }
+    finally { setActionBusy(false); }
+  }
+
+  async function reorder() {
+    setReorderBusy(true); setError(''); setMessage('');
+    try {
+      // Core's reorder endpoint returns currently active order items; it does not mutate
+      // the customer's cart. Add each returned variant through the authoritative cart API.
+      const response = await api<any>(`/orders/${encodeURIComponent(id)}/reorder`);
+      const data = response?.data ?? response ?? {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      const redirect = data.checkout_url || data.redirect_url;
+      if (redirect) { window.location.assign(redirect); return; }
+      if (!items.length) { setMessage('None of the items from this order are currently available to buy again.'); return; }
+
+      let added = 0;
+      let failed = 0;
+      for (const item of items) {
+        const variantId = item?.variant_id;
+        const quantity = Math.max(1, Math.min(20, Number(item?.quantity ?? 1)));
+        if (!variantId) { failed += 1; continue; }
+        try {
+          await api('/storefront/cart/items', {
+            method: 'POST',
+            body: JSON.stringify({ variant_id: Number(variantId), quantity }),
+          });
+          added += 1;
+        } catch { failed += 1; }
+      }
+
+      if (!added) {
+        throw new Error('None of the items from this order could be added to your bag. They may be out of stock.');
+      }
+      if (failed) {
+        setMessage(`${added} ${added === 1 ? 'item was' : 'items were'} added to your bag. ${failed} ${failed === 1 ? 'item was' : 'items were'} unavailable.`);
+      } else {
+        window.location.assign('/cart');
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to reorder this order.'); }
+    finally { setReorderBusy(false); }
+  }
+
+  if (loading) return <main className="accountPage"><div className="emptyState"><h2>Loading order…</h2></div></main>;
+  if (error) return <main className="accountPage"><div className="emptyState"><span className="eyebrow">PRIYASA / ORDER</span><h1>Order unavailable</h1><p>{error}</p><button className="button" type="button" onClick={() => void load()}>Retry</button></div></main>;
+  if (!order) return null;
+
+  const items = order.items || order.line_items || [];
+  const total = order.grand_total ?? order.total ?? order.amount;
+  const address = order.shipping_address || order.shippingAddress || order.address;
+  const status = String(order.status || 'processing').toLowerCase();
+  const paymentStatus = String(order.payment_status || order.payment?.status || '').toLowerCase();
+  const retryPayment = ['pending','failed','created','unpaid','payment_pending'].includes(paymentStatus) || ['payment_pending','payment_failed','pending_payment'].includes(status);
+  const cancellable = !['cancelled','delivered','returned','refunded','completed'].includes(status) && order.cancellable !== false;
+  const terminal = ['cancelled','delivered','returned','refunded','completed'].includes(status);
+  const paymentSettled = ['paid','captured','success','successful'].includes(paymentStatus);
+  const returnRequestable = ['delivered', 'completed'].includes(status) && order.returnable !== false;
+
+  return <main className="accountPage">
+    <div className="sectionHead"><div><span className="eyebrow">PRIYASA / ORDER</span><h1>#{order.order_number || order.id || id}</h1><p className="muted">{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Order details'}</p></div><Link className="textLink" href="/orders">← All orders</Link></div>
+    {error && <div className="formError" role="alert">{error}</div>}
+    {message && <div className="formMessage" role="status">{message}</div>}
+    <div className="orderDetailGrid">
+      <section>
+        <div className="checkoutCard">
+          <div className="orderStatus"><span>Status</span><strong>{label(status)}</strong></div>
+          {paymentStatus && <p className="muted">Payment: <strong>{label(paymentStatus)}</strong></p>}
+          {retryPayment && !terminal && <div className="formMessage"><b>Payment incomplete.</b><span>Your order is not confirmed as paid. You can retry secure payment.</span><Link className="button" href={`/checkout/payment?order=${encodeURIComponent(id)}`}>Retry payment</Link></div>}
+          {paymentSettled && <div className="formMessage" role="status">Payment confirmed by PRIYASA Core.</div>}
+          {items.length ? <div className="orderLines">{items.map((item:any,i:number) => <article key={String(item.id || i)} className="orderLine"><div className="cartThumb">{(item.image || item.product?.image || item.product?.media?.[0]?.url) && <img src={item.image || item.product?.image || item.product?.media?.[0]?.url} alt="" />}</div><div><strong>{item.product_name || item.name || item.product?.name || 'PRIYASA product'}</strong><small>{item.variant_label || item.size || item.variant?.label || 'Standard'} · Qty {item.quantity || 1}</small><b>{money(item.line_total ?? item.total ?? item.unit_price ?? item.price)}</b></div></article>)}</div> : <p className="muted">Order items are not available in this response.</p>}
+        </div>
+        <div className="checkoutCard"><span className="eyebrow">ORDER TIMELINE</span>{timeline.length ? <div className="timeline">{timeline.map((event:any,i:number) => <div className={event.completed === true || i === 0 ? 'done' : ''} key={String(event.id || event.uuid || event.created_at || i)}><b>{label(event.status || event.event || event.type || event.title || 'Order update')}</b><span>{event.description || event.message || event.created_at || event.occurred_at || ''}</span></div>)}</div> : <div className="timeline"><div className="done"><b>Order placed</b><span>{order.created_at ? new Date(order.created_at).toLocaleString('en-IN') : 'Confirmed by PRIYASA'}</span></div><div><b>{label(status)}</b><span>Current order status</span></div></div>}</div>
+        {address && <div className="checkoutCard"><span className="eyebrow">DELIVERY ADDRESS</span><p><strong>{address.name || address.full_name || 'Delivery address'}</strong><br />{[address.address_line1 || address.line1, address.address_line2 || address.line2, address.city, address.state, address.postal_code || address.pincode].filter(Boolean).join(', ')}</p></div>}
+      </section>
+      <aside className="summary">
+        <span className="eyebrow">PRICE DETAILS</span>
+        <div><span>Subtotal</span><b>{money(order.subtotal)}</b></div>{Number(order.discount_total || order.discount) > 0 && <div><span>Discount</span><b>-{money(order.discount_total || order.discount)}</b></div>}<div><span>Shipping</span><b>{Number(order.shipping_total || order.shipping) ? money(order.shipping_total || order.shipping) : 'FREE'}</b></div>{Number(order.tax_total || order.tax) > 0 && <div><span>Tax</span><b>{money(order.tax_total || order.tax)}</b></div>}<hr/><div><strong>Total</strong><strong>{money(total)}</strong></div>
+        {cancellable && <button className="button secondary" type="button" disabled={actionBusy} onClick={() => void cancelOrder()}>{actionBusy ? 'Cancelling…' : 'Cancel order'}</button>}
+        {returnRequestable && <Link className="button secondary" href={`/returns/request?order=${encodeURIComponent(String(order.id || id))}`}>Request return</Link>}
+        {order.id && <><Link className="button" href={`/orders/${encodeURIComponent(String(order.id))}/tracking`}>Track order</Link><Link className="textLink" href={`/orders/${encodeURIComponent(String(order.id))}/invoice`}>View invoice →</Link></>}
+        <button className="button secondary" type="button" disabled={reorderBusy} onClick={() => void reorder()}>{reorderBusy ? 'Adding…' : 'Buy again'}</button>
+      </aside>
+    </div>
+  </main>;
+}

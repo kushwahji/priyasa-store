@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PRIYASA">
+  <rect width="64" height="64" rx="14" fill="#282c3f"/>
+  <path d="M18 16h16c8 0 13 4 13 11s-5 11-13 11h-8v10h-8V16Zm8 7v8h7c4 0 6-1 6-4s-2-4-6-4h-7Z" fill="#fff"/>
+  <circle cx="45" cy="48" r="3" fill="#ff3f6c"/>
+</svg>

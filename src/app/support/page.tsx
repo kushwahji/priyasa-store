@@ -1,0 +1,18 @@
+'use client';
+
+import AuthGuard from '@/components/AuthGuard';
+import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
+
+type Ticket = { id?: number|string; subject?: string; category?: string; status?: string; priority?: string; created_at?: string; updated_at?: string };
+type Category = { id?: number|string; key?: string; name?: string; label?: string };
+
+function SupportContent() {
+  const [tickets,setTickets]=useState<Ticket[]>([]),[categories,setCategories]=useState<Category[]>([]),[category,setCategory]=useState(''),[subject,setSubject]=useState(''),[message,setMessage]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  async function load(){setLoading(true);setError('');try{const [t,c]=await Promise.all([api<any>('/storefront/support/tickets?per_page=30'),api<any>('/storefront/support/categories')]);const tv=t?.data?.items??t?.items??t?.data??[];const cv=c?.items??c?.data??[];setTickets(Array.isArray(tv)?tv:[]);setCategories(Array.isArray(cv)?cv:[])}catch(e){setError(e instanceof Error?e.message:'Unable to load support.')}finally{setLoading(false)}}
+  useEffect(()=>{void load()},[]);
+  async function create(){if(!message.trim()){setError('Please describe how we can help.');return}setBusy(true);setError('');setNotice('');try{await api('/storefront/support/tickets',{method:'POST',body:JSON.stringify({category:category||undefined,subject:subject.trim()||undefined,message:message.trim()})});setSubject('');setMessage('');setNotice('Your support request has been created.');await load()}catch(e){setError(e instanceof Error?e.message:'Unable to create support request.')}finally{setBusy(false)}}
+  return <main className="accountPage"><span className="eyebrow">PRIYASA / SUPPORT</span><h1>Help & support</h1><div className="checkoutGrid"><section className="checkoutCard"><h2>Start a request</h2><label>Category<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Choose a category</option>{categories.map((c,i)=><option key={String(c.id??c.key??i)} value={String(c.key??c.id??c.name??'')}>{c.name??c.label??c.key}</option>)}</select></label><label>Subject<input value={subject} onChange={e=>setSubject(e.target.value)} maxLength={180} placeholder="What do you need help with?"/></label><label>Message<textarea value={message} onChange={e=>setMessage(e.target.value)} rows={6} maxLength={10000} placeholder="Tell us what happened…"/></label>{error&&<div className="formError" role="alert">{error}</div>}{notice&&<div className="formMessage" role="status">{notice}</div>}<button className="button" disabled={busy} onClick={()=>void create()}>{busy?'Creating…':'Create support request'}</button></section><section className="checkoutCard"><div className="sectionHead"><div><span className="eyebrow">YOUR REQUESTS</span><h2>Support history</h2></div><button className="textButton" onClick={()=>void load()} disabled={loading}>Refresh</button></div>{loading?<p className="muted">Loading support requests…</p>:tickets.length===0?<p className="muted">No support requests yet.</p>:<div className="addressList">{tickets.map((t,i)=><article className="addressChoice" key={String(t.id??i)}><strong>{t.subject||'Support request'}</strong><small>{t.category||'General'} · {t.status||'open'}{t.priority?` · ${t.priority}`:''}</small>{t.created_at&&<small>{new Date(t.created_at).toLocaleDateString('en-IN')}</small>}</article>)}</div>}</section></div></main>
+}
+
+export default function SupportPage(){return <AuthGuard><SupportContent/></AuthGuard>}
